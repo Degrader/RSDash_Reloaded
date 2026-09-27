@@ -19,8 +19,6 @@ Rectangle {
     height: 480
     color: "black"
 
-    property int cobbAvailable: lambdaGauge.cobb;
-
     property var pidsData: [
         { gaugeId: ptuGauge,            param: "ptu" },
         { gaugeId: rduGauge,            param: "rdu" },
@@ -268,16 +266,39 @@ Rectangle {
 
         cobb: false
 
+        // Drops the "Connecting" state if the ESP32 never confirms COBB
+        // (request failed or wasn't applied) - two COBB check cycles.
+        Timer {
+            id: cobbPendingTimeout
+            interval: 10000
+            onTriggered: lambdaGauge.cobbPending = false
+        }
+
         MouseArea {
             id: cobbControllerMouseArea
             anchors.top: parent.top
             width: parent.width
             height: parent.height - 40
             onClicked: {
-                console.log("Current COBB Presence Status: " +cobbAvailable)
-                cobbAvailable ? cobbAvailable=0 : cobbAvailable=1
-                console.log("Set COBB Presence Status to: " + cobbAvailable)
-                Controller.sendData("settings", "cobbFriendly", cobbAvailable, null, true)
+                // Ignore taps while waiting for confirmation, so a second
+                // tap can't send the opposite value and cancel the first.
+                if (lambdaGauge.cobbPending) return
+
+                var newValue = lambdaGauge.cobb ? 0 : 1
+                console.log("Current COBB Presence Status: " + lambdaGauge.cobb)
+                console.log("Set COBB Presence Status to: " + newValue)
+                if (newValue === 1) {
+                    lambdaGauge.cobbPending = true
+                    cobbPendingTimeout.restart()
+                }
+                Controller.sendData("settings", "cobbFriendly", newValue, null, false, function(ok) {
+                    if (ok) {
+                        // Confirm right away instead of waiting for the next 5s check
+                        Controller.checkCOBB(true)
+                    } else {
+                        lambdaGauge.cobbPending = false
+                    }
+                })
             }
         }
     }
@@ -741,7 +762,7 @@ Rectangle {
 
     // COBB Access Port presence rarely changes mid-drive (it's set when
     // the user plugs/unplugs the device, or toggles it by tapping the
-    // lambda gauge, which already updates it optimistically). Polling it
+    // lambda gauge, which shows "Connecting" and triggers its own check). Polling it
     // on the same 250ms cadence as live sensor data just doubled network
     // traffic to the ESP32 for no benefit, so it gets its own, much
     // slower timer instead.

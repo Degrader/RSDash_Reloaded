@@ -12,7 +12,7 @@ Starting from v2.3, this build makes the app talk to the ESP32 less often and re
 
 - **Network polling** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/Controller.js`)
   - The COBB Access Port presence check no longer rides along on the 250ms live-data poll. It now runs on its own 5-second timer, roughly halving the request rate to the ESP32.
-  - Both the live-data fetch and the COBB check now skip firing a new request if the previous one for that endpoint hasn't finished yet, so a slow response can't cause requests to pile up on the ESP32's single-threaded HTTP server.
+  - Both the live-data fetch and the COBB check now skip firing a new request if the previous one for that endpoint hasn't finished yet, so a slow response can't cause requests to pile up on the ESP32's single-threaded HTTP server. A request that hasn't finished after 3 seconds is abandoned, so one that never gets a reply (e.g. the ESP32 rebooting mid-response) can't block polling for good.
   - Responses are now checked for a successful HTTP status and safely parsed (try/catch around `JSON.parse`), so a dropped connection or bad reply is logged and skipped instead of throwing inside the poll timer.
 
 - **Gauge rendering** (all `Components/*Gauge.qml` files)
@@ -64,3 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added HTTP status checks and safe JSON parsing around all ESP32 requests
 - Switched all gauge Canvas repaints from a fixed 100ms timer to repaint-on-change, skipping hidden gauges
 - Fixed the Ready-to-Race popup's missing `res/rtr2.png` reference
+
+### [2.4JC] - 2026-09-26
+- Added a 3s timeout to the in-flight request guards so a request that never completes can't stop polling
+- Tapping the lambda gauge to enable COBB now shows an orange "COBB APv3 / CONNECTING" state until the ESP32 confirms it; taps are ignored while connecting, and a COBB check runs as soon as the change is accepted instead of waiting for the 5s timer
+- Fixed torque gauges drawing the indicator dot
+- Installer now keeps the user's existing `NutronConfig.ini` on update (set `OVERWRITE_CONFIG="true"` in `autoinstall.sh` to force a replace)

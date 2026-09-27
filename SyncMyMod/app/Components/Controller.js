@@ -10,8 +10,21 @@
 // Guards against firing a new request for an endpoint while a previous
 // one is still in flight (the ESP32's HTTP server is not built for
 // concurrent connections, so overlapping requests just build up latency).
+// Qt's XMLHttpRequest has no timeout of its own, so a request that never
+// completes (e.g. the ESP32 rebooting mid-response) is abandoned after
+// REQUEST_TIMEOUT_MS instead of blocking that endpoint forever.
+var REQUEST_TIMEOUT_MS = 3000;
 var requestsInFlight = {};
-var cobbCheckInFlight = false;
+var cobbCheckInFlight = null;
+
+// Returns true if a new request may start: nothing is pending, or the
+// pending request has outlived REQUEST_TIMEOUT_MS (it is aborted here).
+function canStartRequest(pending) {
+    if (!pending) return true;
+    if (Date.now() - pending.started < REQUEST_TIMEOUT_MS) return false;
+    pending.xhr.abort();
+    return true;
+}
 
 function loadSettings() {
     var xhr = new XMLHttpRequest();
@@ -40,17 +53,23 @@ function loadSettings() {
 }
 
 function fetchData(endpoint, data, dummy) {
-    if (requestsInFlight[endpoint]) {
+    if (!canStartRequest(requestsInFlight[endpoint])) {
         // Previous poll for this endpoint hasn't finished yet - skip this
         // tick instead of stacking another request behind it.
         return;
     }
-    requestsInFlight[endpoint] = true;
 
     var xhr = new XMLHttpRequest();
+    var request = { xhr: xhr, started: Date.now() };
+    requestsInFlight[endpoint] = request;
+
     xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE) {
-            requestsInFlight[endpoint] = false;
+            // Only free the slot if it's still ours - an abandoned request
+            // finishing late must not free the slot of its replacement.
+            if (requestsInFlight[endpoint] === request) {
+                requestsInFlight[endpoint] = null;
+            }
 
             if (xhr.status !== 200) {
                 return;
@@ -76,16 +95,24 @@ function fetchData(endpoint, data, dummy) {
     xhr.send();
 }
 
-function checkCOBB() {
-    if (cobbCheckInFlight) {
+// force: replace any check already in flight - it may have been sent
+// before a COBB change was applied and would report the old state.
+function checkCOBB(force) {
+    if (force && cobbCheckInFlight) {
+        cobbCheckInFlight.xhr.abort();
+    } else if (!canStartRequest(cobbCheckInFlight)) {
         return;
     }
-    cobbCheckInFlight = true;
 
     var xhr = new XMLHttpRequest();
+    var request = { xhr: xhr, started: Date.now() };
+    cobbCheckInFlight = request;
+
     xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE) {
-            cobbCheckInFlight = false;
+            if (cobbCheckInFlight === request) {
+                cobbCheckInFlight = null;
+            }
 
             if (xhr.status !== 200) {
                 return;
@@ -106,7 +133,8 @@ function checkCOBB() {
     xhr.send();
 }
 
-function sendData(endpoint, gauge, value, control, dummy) {
+// onDone (optional): called with true/false for whether the POST succeeded.
+function sendData(endpoint, gauge, value, control, dummy, onDone) {
     var xhr = new XMLHttpRequest();
     xhr.open("POST", mainUrl + endpoint, true);
     xhr.setRequestHeader("Content-Type", "application/json");
@@ -124,6 +152,7 @@ function sendData(endpoint, gauge, value, control, dummy) {
                 }
             } else {
             }
+            if (onDone) onDone(xhr.status === 200);
         }
     };
     xhr.send(JSON.stringify(data));

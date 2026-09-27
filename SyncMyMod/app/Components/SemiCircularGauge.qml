@@ -92,7 +92,7 @@ Rectangle {
                 ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
                 ctx.stroke();
 
-                if (!measureType != "torque" && currentValue != 0) {
+                if (measureType != "torque" && currentValue != 0) {
                     ctx.fillStyle = "#2A2A2A";
                     ctx.strokeStyle = colour;
                     ctx.lineWidth = 4;

@@ -26,7 +26,7 @@
 # App Name      : RSdash
 # Author        : Au{R}oN (www.fmods.net)
 # Creation date : 2025-10-03
-# Version       : 2.3
+# Version       : 2.4
 
 #########################################################################################################################################################
 #                                                                 Custom App Variables                                                                  #
@@ -37,6 +37,7 @@ APP_NAME="RSdash"                # VISIBLE DURING INSTALLATION PROCESS AND FROM 
 APP_FOLDER="rsdash"              # APP FOLDER. NO SPACE OR SPECIAL CHARS ALLOWED!!
 APP_FILE="Nutron.qml"            # MAIN APP FILE. NO SPACE OR SPECIAL CHARS ALLOWED, FIRST LETTER MUST BE IN UPPERCASE!!
 APP_HIDETITLE="true"             # USED TO DEFINE IF TITLEBAR MUST REMAIN VISIBLE OR NOT. ONLY TRUE OR FALSE ALLOWED!!
+OVERWRITE_CONFIG="false"         # SET TO true ONLY IF THIS BUILD MUST REPLACE THE USER'S EXISTING NutronConfig.ini. ONLY TRUE OR FALSE ALLOWED!!
 
 AUTHOR="Au{R}oN - www.fmods.net" # DEVELOPER NAME VISIBLE DURING THE INSTALLATION PROCESS. ALL CHARS ALLOWED BUT SOME SPECIAL CHARS MAY CAUSE ISSUES
 
@@ -177,7 +178,12 @@ output "Copying files..." 2
 cp -R "${LOCAL_APP_PATH}"/*	"${APIM_APPS_PATH}"/"${APP_AUTHOR}"/"${APP_FOLDER}"
 progress 62
 mkdir -p /fs/rwdata/fmods
-mv "${APIM_APPS_PATH}"/"${APP_AUTHOR}"/"${APP_FOLDER}"/NutronConfig.ini /fs/rwdata/fmods
+# Keep the user's saved settings across updates unless this build forces a fresh config
+if [ "${OVERWRITE_CONFIG}" = "true" ] || [ ! -f /fs/rwdata/fmods/NutronConfig.ini ]; then
+    mv "${APIM_APPS_PATH}"/"${APP_AUTHOR}"/"${APP_FOLDER}"/NutronConfig.ini /fs/rwdata/fmods
+else
+    rm -f "${APIM_APPS_PATH}"/"${APP_AUTHOR}"/"${APP_FOLDER}"/NutronConfig.ini
+fi
 
 #########################################################################################################################################################
 #                                                                   Remount FS as RO                                                                    #

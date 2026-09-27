@@ -45,6 +45,12 @@ Rectangle {
     property bool reverse: false
     property bool ignoreUnit: false
     property bool cobb: false
+    // Set when COBB was requested but the ESP32 hasn't confirmed it yet;
+    // cleared automatically once cobb comes back true.
+    property bool cobbPending: false
+
+    readonly property bool cobbStyle: cobb || cobbPending
+    readonly property color cobbColour: cobb ? "#329BFD" : "#FFA000"
 
     property real currentValue: 0
 
@@ -53,7 +59,11 @@ Rectangle {
     // means a gauge that's currently hidden (e.g. behind another view)
     // does no redraw work at all until it becomes visible again.
     onCurrentValueChanged: if (visible) plasmaGaugeCanvas.requestPaint()
-    onCobbChanged: if (visible) plasmaGaugeCanvas.requestPaint()
+    onCobbChanged: {
+        if (cobb) cobbPending = false
+        if (visible) plasmaGaugeCanvas.requestPaint()
+    }
+    onCobbPendingChanged: if (visible) plasmaGaugeCanvas.requestPaint()
     onVisibleChanged: if (visible) plasmaGaugeCanvas.requestPaint()
     Component.onCompleted: plasmaGaugeCanvas.requestPaint()
 
@@ -86,9 +96,9 @@ Rectangle {
                 }
 
                 ctx.reset();
-                var ringThick = cobb ? cobbThick : thick;
+                var ringThick = cobbStyle ? cobbThick : thick;
 
-                ctx.strokeStyle = cobb ? "#329BFD" : "#1e1e1e";
+                ctx.strokeStyle = cobbStyle ? cobbColour : "#1e1e1e";
                 ctx.lineCap = "round";
                 ctx.lineWidth = ringThick;
                 ctx.beginPath();
@@ -96,12 +106,12 @@ Rectangle {
                 ctx.stroke();
 
 
-                ctx.strokeStyle = cobb ? "#329BFD" : colour;
+                ctx.strokeStyle = cobbStyle ? cobbColour : colour;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius - ringThick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
                 ctx.stroke();
 
-                if (!cobb) {
+                if (!cobbStyle) {
                     ctx.fillStyle = "#2A2A2A";
                     ctx.strokeStyle = colour;
                     ctx.lineWidth = 5;
@@ -117,11 +127,11 @@ Rectangle {
             id: gaugeValueText
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -15
-            font.pixelSize: cobb ? 28 : valueSize
+            font.pixelSize: cobbStyle ? 28 : valueSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
-            text: cobb ? "COBB APv3" : Controller.getValue() + unitSymbol
-            color: cobb ? "#329BFD" : "white"
+            text: cobbStyle ? "COBB APv3" : Controller.getValue() + unitSymbol
+            color: cobbStyle ? cobbColour : "white"
         }
 
         Text {
@@ -131,8 +141,8 @@ Rectangle {
             font.pixelSize: nameSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
-            text: cobb ? "CONNECTED" : name
-            color: cobb ? "#329BFD" : "#F8E63C"
+            text: cobb ? "CONNECTED" : cobbPending ? "CONNECTING" : name
+            color: cobbStyle ? cobbColour : "#F8E63C"
         }
     }
 }
