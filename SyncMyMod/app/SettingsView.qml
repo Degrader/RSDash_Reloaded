@@ -20,7 +20,8 @@ Rectangle {
     color: "black"
 
     Component.onCompleted: {
-        version = Controller.getVersion()
+        // Sets version itself once version.txt loads (it returns nothing)
+        Controller.getVersion()
         // Refresh the OBD mode in case it was changed from the RSapp phone app
         Controller.checkNotAlone()
     }

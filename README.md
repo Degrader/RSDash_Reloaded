@@ -32,6 +32,10 @@ Starting from v2.5, the NOT ALONE function has moved to the settings page and th
   - Oil temp is now top-center; lambda is bottom-center.
   - In Not Alone mode the ESP32 stops requesting lambda, the only value it asks the engine computer (PCM) for, so the lambda slot shows both RDU clutch temps side by side in a new split gauge instead. These come from the AWD module and keep updating.
 
+## Testing on a PC
+
+`dev/` has a harness that runs the app against a fake ESP32, clicks through it, checks for QML errors and Sync 3 compatibility problems, and takes screenshots. See [dev/README.md](dev/README.md).
+
 ## Changelog
 
 All notable changes to this project will be documented in this file.
@@ -86,3 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In Not Alone mode the lambda slot now shows both RDU clutch temps in a new split gauge, replacing the "COBB APv3" connecting/connected label
 - Swapped the Oil and lambda gauges: Oil is now top-center, lambda / RDU clutch temps bottom-center
 - Installer replaces `NutronConfig.ini` for this release (`OVERWRITE_CONFIG="true"`), resetting saved units and the extra view to their defaults
+- Fixed the settings page not re-reading the OBD mode when opened (an error on the line before it stopped it running)
+- Fixed a binding loop warning in the Ready To Race popup trigger (no change in behavior)
+- Added the `dev/` test harness (PC only, not installed)

@@ -73,9 +73,12 @@ Rectangle {
         scale: 1.0
         opacity: 0.0
 
-        property bool conditionOk: (oilGauge.currentValue >= oilGauge.lowTreshold
+        // rtrDisplayed is checked in onConditionOkChanged rather than here:
+        // fadeInAnim sets it while conditionOk is still changing, which made
+        // this a binding loop.
+        property bool conditionOk: oilGauge.currentValue >= oilGauge.lowTreshold
                                    && rduGauge.currentValue >= rduGauge.lowTreshold
-                                   && ptuGauge.currentValue >= ptuGauge.lowTreshold) && !rtrDisplayed
+                                   && ptuGauge.currentValue >= ptuGauge.lowTreshold
 
         Timer {
             id: mainTimer
@@ -118,7 +121,7 @@ Rectangle {
         }
 
         onConditionOkChanged: {
-            if (conditionOk) {
+            if (conditionOk && !rtrDisplayed) {
                 fadeInAnim.start()
             }
         }
