@@ -5,6 +5,7 @@
     python dev/harness.py --list           list the scenarios
     python dev/harness.py --interactive    open a clickable 800x480 window
                           [--not-alone] [--animate]
+    python dev/harness.py --readme-shots   re-render the README screenshots (docs/screenshots/)
 
 Scenarios drive the real UI (clicks land on the app's own MouseAreas), check
 app state, and save screenshots. Any QML warning or error fails the run, as
@@ -46,6 +47,7 @@ from mock_esp32 import MockEsp32
 DEV = Path(__file__).resolve().parent
 APP = DEV.parent / "SyncMyMod" / "app"
 OUT = DEV / "out"
+README_SHOTS = DEV.parent / "docs" / "screenshots"
 
 # Imports the original app uses, i.e. known to exist on the Sync 3.
 IMPORT_BASELINE = {"QtQuick": (2, 6), "QtQuick.Controls": (1, 3), "QtQuick.Window": (2, 1)}
@@ -268,9 +270,9 @@ class Harness:
         if not ok:
             self.failures.append(what)
 
-    def shot(self, name):
-        OUT.mkdir(exist_ok=True)
-        path = OUT / (name + ".png")
+    def shot(self, name, folder=OUT):
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / (name + ".png")
         image = self.view.grabWindow()
         if image.isNull() or not image.save(str(path)):
             raise HarnessError("screenshot %s failed" % name)
@@ -575,6 +577,26 @@ def run_scenarios(h, log, names):
     return total_problems
 
 
+def render_readme_shots(h):
+    """Renders the screenshots shown in README.md into docs/screenshots/."""
+    h.start_app(pids={"rdutql": 240, "rdutqr": 310})
+    h.shot("main_view", README_SHOTS)
+    h.click("rduRowToggle")
+    h.wait(300)
+    h.shot("main_view_rdu_temps", README_SHOTS)
+
+    h.start_app(settings={"cobbFriendly": 1}, pids={"rdutql": 240, "rdutqr": 310})
+    h.shot("main_view_not_alone", README_SHOTS)
+
+    h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1, "esp": 1, "disableStartStop": 1, "driveMode": 2})
+    h.click("nutronLogo")
+    h.goto_page("SecondaryView.qml")
+    h.shot("drive_modes", README_SHOTS)
+    h.click("settingsButton")
+    h.goto_page("SettingsView.qml")
+    h.shot("settings", README_SHOTS)
+
+
 def run_interactive(h, args):
     h.start_app(settings={"cobbFriendly": int(args.not_alone)}, suppress_rtr=False)
     h.mock.animate = args.animate
@@ -602,6 +624,7 @@ def main():
     parser.add_argument("--interactive", action="store_true", help="open a clickable window instead")
     parser.add_argument("--not-alone", action="store_true", help="interactive: start in OBD Not Alone")
     parser.add_argument("--animate", action="store_true", help="interactive: drift the live values")
+    parser.add_argument("--readme-shots", action="store_true", help="render the README screenshots into docs/screenshots/")
     parser.add_argument("--verbose", action="store_true", help="also print the app's console.log output")
     args = parser.parse_args()
 
@@ -625,6 +648,15 @@ def main():
         if args.interactive:
             run_interactive(h, args)
             return 0
+        if args.readme_shots:
+            print("\n== README screenshots")
+            mark = log.mark()
+            render_readme_shots(h)
+            h.stop_app()
+            problems = log.problems_since(mark)
+            for text in problems:
+                print("    QML  %s" % text)
+            return 1 if problems else 0
         qml_problems = run_scenarios(h, log, args.names)
     finally:
         h.close()

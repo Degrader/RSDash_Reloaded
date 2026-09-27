@@ -24,6 +24,14 @@ Each run does three things:
 
 Screenshots go to `dev/out/` (not committed). The exit code is 0 only if everything passed.
 
+## README screenshots
+
+```
+python dev/harness.py --readme-shots
+```
+
+This re-renders the screenshots shown in the main README into `docs/screenshots/`, which are committed. Run it after a UI change, then commit the updated images.
+
 The harness uses a real window parked off-screen, so it won't take focus. The app gets a temp copy of `NutronConfig.ini`, so your repo copy is never changed.
 
 ## Clicking around yourself

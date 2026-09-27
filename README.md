@@ -6,6 +6,18 @@ RSdash is a free application specifically developed for the Ford Focus RS MK3.5.
 
 All credit for the original design, the gauge layout, and the ESP32 firmware goes to the original authors above. This fork keeps their app intact and focuses on tightening up performance on the Sync 3 head unit, plus a few layout and settings changes.
 
+## Screenshots
+
+| Main view | Main view, OBD Not Alone |
+|:---:|:---:|
+| ![Main view: PTU, oil, RDU and lambda gauges, the LC button, tire pressures and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with both RDU clutch temps in place of lambda](docs/screenshots/main_view_not_alone.png) |
+| **RDU clutch temps** (tap the RDU Torque row) | **Drive modes** |
+| ![Main view with the bottom-right row showing RDU clutch temps](docs/screenshots/main_view_rdu_temps.png) | ![Drive mode page: startup drive mode, Drift Stick, ESP Sport and auto start/stop](docs/screenshots/drive_modes.png) |
+| **Settings** | |
+| ![Settings page: temperature, pressure and torque units, and the OBD mode](docs/screenshots/settings.png) | |
+
+These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
+
 ## What's changed in this fork
 
 Starting from v2.3, this build makes the app talk to the ESP32 less often and redraw the gauges only when something actually changes, instead of on fixed timers regardless of activity:
