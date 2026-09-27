@@ -19,7 +19,40 @@ Rectangle {
     height: 480
     color: "black"
 
-    Component.onCompleted: version = Controller.getVersion()
+    Component.onCompleted: {
+        version = Controller.getVersion()
+        // Refresh the OBD mode in case it was changed from the RSapp phone app
+        Controller.checkNotAlone()
+    }
+
+    // Set while a new OBD mode is being sent to the ESP32, so a second
+    // tap can't race the first.
+    property bool obdRequestPending: false
+
+    // The OBD mode lives on the ESP32 (shared with the RSapp phone app),
+    // not in the ini, so it isn't part of saveSettings().
+    function setNotAlone(value) {
+        if (obdRequestPending) return
+        obdRequestPending = true
+        obdPendingTimeout.restart()
+        Controller.sendData("settings", "cobbFriendly", value ? 1 : 0, null, false, function(ok) {
+            obdRequestPending = false
+            obdPendingTimeout.stop()
+            if (ok) {
+                notAlone = value
+                // Confirm the ESP32 actually applied it
+                Controller.checkNotAlone(true)
+            }
+        })
+    }
+
+    // Qt's XMLHttpRequest has no timeout of its own, so don't lock the
+    // toggle forever if the ESP32 never answers.
+    Timer {
+        id: obdPendingTimeout
+        interval: 5000
+        onTriggered: obdRequestPending = false
+    }
 
 
     Image {
@@ -56,6 +89,8 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
+        // Keeps the fifth toggle clear of the title
+        anchors.verticalCenterOffset: 20
         spacing: 20
 
         CustomToggle {
@@ -130,6 +165,29 @@ Rectangle {
                     mouse.accepted = false
                     extraAreaViewToggle.currentState = (extraAreaViewToggle.currentState === extraAreaViewToggle.option1 ? extraAreaViewToggle.option2 : extraAreaViewToggle.option1);
                     saveSettings()
+                }
+            }
+        }
+
+        // Alone: lambda on the gauge page. Not Alone: the ESP32 stops
+        // requesting lambda from the PCM so another OBD device can use it,
+        // and the gauge page shows the RDU clutch temps instead.
+        CustomToggle {
+            id: obdToggle
+            label: "OBD"
+            option1: "Alone"
+            option2: "Not Alone"
+            currentState: notAlone ? option2 : option1
+            // Dimmed while the change is being sent to the ESP32
+            opacity: obdRequestPending ? 0.5 : 1.0
+
+            MouseArea {
+                id: obdToggleMouseArea
+                anchors.fill: parent
+                propagateComposedEvents: true
+                onClicked: {
+                    mouse.accepted = false
+                    setNotAlone(!notAlone)
                 }
             }
         }

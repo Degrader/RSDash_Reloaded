@@ -232,81 +232,10 @@ Rectangle {
     }
 
     PlasmaGauge {
-        id: lambdaGauge
+        id: oilGauge
         anchors.margins: 30
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        height: size
-        width: size
-        size: 220
-        thick: 24
-        cobbThick: 12
-
-        unitSymbol: cobb ? "" : "^"
-        ignoreUnit: true
-
-        name: "Lambda"
-        nameSize: 25
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        decimal: 2
-        measureType: "raw"
-
-        valueSize: 43
-        minValue: 0
-        maxValue: 2
-
-        lowTreshold: 0.5
-        highTreshold: 1.5
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
-
-        cobb: false
-
-        // Drops the "Connecting" state if the ESP32 never confirms COBB
-        // (request failed or wasn't applied) - two COBB check cycles.
-        Timer {
-            id: cobbPendingTimeout
-            interval: 10000
-            onTriggered: lambdaGauge.cobbPending = false
-        }
-
-        MouseArea {
-            id: cobbControllerMouseArea
-            anchors.top: parent.top
-            width: parent.width
-            height: parent.height - 40
-            onClicked: {
-                // Ignore taps while waiting for confirmation, so a second
-                // tap can't send the opposite value and cancel the first.
-                if (lambdaGauge.cobbPending) return
-
-                var newValue = lambdaGauge.cobb ? 0 : 1
-                console.log("Current COBB Presence Status: " + lambdaGauge.cobb)
-                console.log("Set COBB Presence Status to: " + newValue)
-                if (newValue === 1) {
-                    lambdaGauge.cobbPending = true
-                    cobbPendingTimeout.restart()
-                }
-                Controller.sendData("settings", "cobbFriendly", newValue, null, false, function(ok) {
-                    if (ok) {
-                        // Confirm right away instead of waiting for the next 5s check
-                        Controller.checkCOBB(true)
-                    } else {
-                        lambdaGauge.cobbPending = false
-                    }
-                })
-            }
-        }
-    }
-
-    PlasmaGauge {
-        id: oilGauge
-        anchors.bottom: parent.bottom
-        anchors.left: lambdaGauge.left
         height: size
         width: size
         size: 220
@@ -334,10 +263,83 @@ Rectangle {
         endAngleDegrees: 395
     }
 
+    PlasmaGauge {
+        id: lambdaGauge
+        anchors.bottom: parent.bottom
+        anchors.left: oilGauge.left
+        height: size
+        width: size
+        size: 220
+        thick: 24
+
+        unitSymbol: "^"
+        ignoreUnit: true
+
+        name: "Lambda"
+        nameSize: 25
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        decimal: 2
+        measureType: "raw"
+
+        valueSize: 43
+        minValue: 0
+        maxValue: 2
+
+        lowTreshold: 0.5
+        highTreshold: 1.5
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+
+        // OBD "Alone" - see clutchTempGauge for "Not Alone"
+        visible: !notAlone
+    }
+
+    // In OBD "Not Alone" mode (settings page) the ESP32 stops requesting
+    // lambda, the only value it asks the PCM for, so this slot shows both
+    // RDU clutch temps instead - they come from the AWD module and keep
+    // updating.
+    SplitPlasmaGauge {
+        id: clutchTempGauge
+        anchors.fill: lambdaGauge
+        visible: notAlone
+
+        thick: 24
+
+        caption: "NOT ALONE"
+        captionColor: "#329BFD"
+        captionSize: 14
+
+        name: "RDU Clutch"
+        nameSize: 20
+
+        unitSymbol: "°"
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 26
+        decimal: 0
+        measureType: "temperature"
+
+        // Same scale as the clutch temp gauges in the RDU extra area
+        minValue: 0
+        maxValue: 120
+
+        lowTreshold: 0
+        highTreshold: 120
+
+        leftValue: leftRDUTempGauge.currentValue
+        rightValue: rightRDUTempGauge.currentValue
+    }
+
     ButtonGauge {
         id: lcGauge
-        anchors.top: lambdaGauge.top
-        anchors.left: lambdaGauge.right
+        anchors.top: oilGauge.top
+        anchors.left: oilGauge.right
         anchors.leftMargin: 10
         width: size
         height: size
@@ -405,7 +407,7 @@ Rectangle {
         id: extraTPMSArea
         anchors.top: lcGauge.bottom
         anchors.left: lcGauge.left
-        anchors.bottom: oilGauge.bottom
+        anchors.bottom: lambdaGauge.bottom
         anchors.right: espGauge.right
 
         color: "transparent"
@@ -576,7 +578,7 @@ Rectangle {
         id: extraRDUArea
         anchors.top: lcGauge.bottom
         anchors.left: lcGauge.left
-        anchors.bottom: oilGauge.bottom
+        anchors.bottom: lambdaGauge.bottom
         anchors.right: espGauge.right
 
         color: "transparent"
@@ -748,8 +750,8 @@ Rectangle {
     }
 
     // Polls live PID values (temps, pressures, etc.) at the configured
-    // refresh rate. COBB presence is intentionally NOT checked here
-    // anymore - see cobbTimer below.
+    // refresh rate. The OBD Alone / Not Alone mode is intentionally NOT
+    // checked here - see notAloneTimer below.
     Timer {
         id: fetchDataTimer
         interval: refresh
@@ -760,19 +762,18 @@ Rectangle {
         }
     }
 
-    // COBB Access Port presence rarely changes mid-drive (it's set when
-    // the user plugs/unplugs the device, or toggles it by tapping the
-    // lambda gauge, which shows "Connecting" and triggers its own check). Polling it
-    // on the same 250ms cadence as live sensor data just doubled network
-    // traffic to the ESP32 for no benefit, so it gets its own, much
+    // The OBD mode rarely changes mid-drive (it's set on the settings page,
+    // or from the RSapp phone app, which shares it through the ESP32).
+    // Polling it on the same 250ms cadence as live sensor data just doubled
+    // network traffic to the ESP32 for no benefit, so it gets its own, much
     // slower timer instead.
     Timer {
-        id: cobbTimer
+        id: notAloneTimer
         interval: 5000
         running: true
         repeat: true
         onTriggered: {
-            Controller.checkCOBB();
+            Controller.checkNotAlone();
         }
     }
 
@@ -780,6 +781,6 @@ Rectangle {
         console.log("Primary View Loaded. Fetching data due to Page Load...")
         Controller.fetchData("pids", pidsData, false);
         Controller.fetchData("settings", settingsData, false);
-        Controller.checkCOBB();
+        Controller.checkNotAlone();
     }
 }

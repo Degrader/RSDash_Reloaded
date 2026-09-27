@@ -26,7 +26,7 @@
 # App Name      : RSdash
 # Author        : Au{R}oN (www.fmods.net)
 # Creation date : 2025-10-03
-# Version       : 2.4
+# Version       : 2.5
 
 #########################################################################################################################################################
 #                                                                 Custom App Variables                                                                  #
@@ -37,7 +37,7 @@ APP_NAME="RSdash"                # VISIBLE DURING INSTALLATION PROCESS AND FROM 
 APP_FOLDER="rsdash"              # APP FOLDER. NO SPACE OR SPECIAL CHARS ALLOWED!!
 APP_FILE="Nutron.qml"            # MAIN APP FILE. NO SPACE OR SPECIAL CHARS ALLOWED, FIRST LETTER MUST BE IN UPPERCASE!!
 APP_HIDETITLE="true"             # USED TO DEFINE IF TITLEBAR MUST REMAIN VISIBLE OR NOT. ONLY TRUE OR FALSE ALLOWED!!
-OVERWRITE_CONFIG="false"         # SET TO true ONLY IF THIS BUILD MUST REPLACE THE USER'S EXISTING NutronConfig.ini. ONLY TRUE OR FALSE ALLOWED!!
+OVERWRITE_CONFIG="true"          # SET TO true ONLY IF THIS BUILD MUST REPLACE THE USER'S EXISTING NutronConfig.ini. ONLY TRUE OR FALSE ALLOWED!!
 
 AUTHOR="Au{R}oN - www.fmods.net" # DEVELOPER NAME VISIBLE DURING THE INSTALLATION PROCESS. ALL CHARS ALLOWED BUT SOME SPECIAL CHARS MAY CAUSE ISSUES
 

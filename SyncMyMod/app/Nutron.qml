@@ -29,6 +29,11 @@ Rectangle {
     property string torqueUnit
     property string extraAreaView
 
+    // OBD "Not Alone" mode: the ESP32 stops requesting lambda from the PCM
+    // so another OBD device (COBB AP, scan tool) can use it. Stored on the
+    // ESP32 as cobbFriendly, not in the ini; set on the settings page.
+    property bool notAlone: false
+
     property bool rtrDisplayed: false
 
     Component.onCompleted: {

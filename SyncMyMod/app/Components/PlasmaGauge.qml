@@ -28,7 +28,6 @@ Rectangle {
 
     property int size
     property int thick
-    property int cobbThick: thick
 
     property string measureType
     property int decimal
@@ -44,26 +43,14 @@ Rectangle {
 
     property bool reverse: false
     property bool ignoreUnit: false
-    property bool cobb: false
-    // Set when COBB was requested but the ESP32 hasn't confirmed it yet;
-    // cleared automatically once cobb comes back true.
-    property bool cobbPending: false
-
-    readonly property bool cobbStyle: cobb || cobbPending
-    readonly property color cobbColour: cobb ? "#329BFD" : "#FFA000"
 
     property real currentValue: 0
 
-    // Repaint only when something that actually changes the drawing
-    // changes, instead of an unconditional 10x/second timer. This also
+    // Repaint only when the value actually changes, instead of an
+    // unconditional 10x/second timer. This also
     // means a gauge that's currently hidden (e.g. behind another view)
     // does no redraw work at all until it becomes visible again.
     onCurrentValueChanged: if (visible) plasmaGaugeCanvas.requestPaint()
-    onCobbChanged: {
-        if (cobb) cobbPending = false
-        if (visible) plasmaGaugeCanvas.requestPaint()
-    }
-    onCobbPendingChanged: if (visible) plasmaGaugeCanvas.requestPaint()
     onVisibleChanged: if (visible) plasmaGaugeCanvas.requestPaint()
     Component.onCompleted: plasmaGaugeCanvas.requestPaint()
 
@@ -96,30 +83,26 @@ Rectangle {
                 }
 
                 ctx.reset();
-                var ringThick = cobbStyle ? cobbThick : thick;
-
-                ctx.strokeStyle = cobbStyle ? cobbColour : "#1e1e1e";
+                ctx.strokeStyle = "#1e1e1e";
                 ctx.lineCap = "round";
-                ctx.lineWidth = ringThick;
+                ctx.lineWidth = thick;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, radius - ringThick, startAngle * Math.PI / 180, endAngle * Math.PI / 180, reverse);
+                ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, endAngle * Math.PI / 180, reverse);
                 ctx.stroke();
 
 
-                ctx.strokeStyle = cobbStyle ? cobbColour : colour;
+                ctx.strokeStyle = colour;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, radius - ringThick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
+                ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
                 ctx.stroke();
 
-                if (!cobbStyle) {
-                    ctx.fillStyle = "#2A2A2A";
-                    ctx.strokeStyle = colour;
-                    ctx.lineWidth = 5;
-                    ctx.beginPath();
-                    ctx.arc(centerX + (radius - thick) * Math.cos(progressAngle * Math.PI / 180), centerY + (radius - thick) * Math.sin(progressAngle * Math.PI / 180), indicatorRadius, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                }
+                ctx.fillStyle = "#2A2A2A";
+                ctx.strokeStyle = colour;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.arc(centerX + (radius - thick) * Math.cos(progressAngle * Math.PI / 180), centerY + (radius - thick) * Math.sin(progressAngle * Math.PI / 180), indicatorRadius, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
             }
         }
 
@@ -127,11 +110,11 @@ Rectangle {
             id: gaugeValueText
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -15
-            font.pixelSize: cobbStyle ? 28 : valueSize
+            font.pixelSize: valueSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
-            text: cobbStyle ? "COBB APv3" : Controller.getValue() + unitSymbol
-            color: cobbStyle ? cobbColour : "white"
+            text: Controller.getValue() + unitSymbol
+            color: "white"
         }
 
         Text {
@@ -141,8 +124,8 @@ Rectangle {
             font.pixelSize: nameSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
-            text: cobb ? "CONNECTED" : cobbPending ? "CONNECTING" : name
-            color: cobbStyle ? cobbColour : "#F8E63C"
+            text: name
+            color: "#F8E63C"
         }
     }
 }

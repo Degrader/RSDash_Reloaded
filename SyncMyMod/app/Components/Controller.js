@@ -15,7 +15,7 @@
 // REQUEST_TIMEOUT_MS instead of blocking that endpoint forever.
 var REQUEST_TIMEOUT_MS = 3000;
 var requestsInFlight = {};
-var cobbCheckInFlight = null;
+var notAloneCheckInFlight = null;
 
 // Returns true if a new request may start: nothing is pending, or the
 // pending request has outlived REQUEST_TIMEOUT_MS (it is aborted here).
@@ -95,23 +95,24 @@ function fetchData(endpoint, data, dummy) {
     xhr.send();
 }
 
+// Reads the OBD Alone / Not Alone mode (cobbFriendly) from the ESP32.
 // force: replace any check already in flight - it may have been sent
-// before a COBB change was applied and would report the old state.
-function checkCOBB(force) {
-    if (force && cobbCheckInFlight) {
-        cobbCheckInFlight.xhr.abort();
-    } else if (!canStartRequest(cobbCheckInFlight)) {
+// before a change was applied and would report the old state.
+function checkNotAlone(force) {
+    if (force && notAloneCheckInFlight) {
+        notAloneCheckInFlight.xhr.abort();
+    } else if (!canStartRequest(notAloneCheckInFlight)) {
         return;
     }
 
     var xhr = new XMLHttpRequest();
     var request = { xhr: xhr, started: Date.now() };
-    cobbCheckInFlight = request;
+    notAloneCheckInFlight = request;
 
     xhr.onreadystatechange = function() {
         if (xhr.readyState === XMLHttpRequest.DONE) {
-            if (cobbCheckInFlight === request) {
-                cobbCheckInFlight = null;
+            if (notAloneCheckInFlight === request) {
+                notAloneCheckInFlight = null;
             }
 
             if (xhr.status !== 200) {
@@ -121,10 +122,10 @@ function checkCOBB(force) {
             try {
                 var jsonData = JSON.parse(xhr.responseText);
                 if (jsonData.hasOwnProperty("cobbFriendly")) {
-                    lambdaGauge.cobb = (jsonData.cobbFriendly === 1);
+                    notAlone = (jsonData.cobbFriendly === 1);
                 }
             } catch (e) {
-                console.log("checkCOBB: failed to parse response: " + e);
+                console.log("checkNotAlone: failed to parse response: " + e);
             }
         }
     }
@@ -189,9 +190,12 @@ function getValueREADABLE() {
     }
 }
 
-function getValue() {
-    if (measureType === "raw") return currentValue.toFixed(decimal);
-    if (ignoreUnit) return currentValue.toFixed(decimal);
+// value (optional): format this number instead of currentValue, for
+// gauges that show more than one reading.
+function getValue(value) {
+    if (value === undefined) value = currentValue;
+    if (measureType === "raw") return value.toFixed(decimal);
+    if (ignoreUnit) return value.toFixed(decimal);
 
     var conversion = {
         pressure: { "Bar": 1, "PSI": 14.5038 },
@@ -207,11 +211,11 @@ function getValue() {
 
     var unit = unitMap[measureType];
 
-    if (!conversion[measureType] || !unit) return currentValue.toFixed(decimal);
+    if (!conversion[measureType] || !unit) return value.toFixed(decimal);
 
     var factor = conversion[measureType][unit];
 
-    return (typeof factor === "function" ? factor(currentValue) : currentValue * factor).toFixed(decimal);
+    return (typeof factor === "function" ? factor(value) : value * factor).toFixed(decimal);
 }
 
 function checkDummyGauges() {
