@@ -90,8 +90,6 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
-        // Keeps the fifth toggle clear of the title
-        anchors.verticalCenterOffset: 20
         spacing: 20
 
         CustomToggle {
@@ -151,25 +149,6 @@ Rectangle {
             }
         }
 
-        CustomToggle {
-            id: extraAreaViewToggle
-            label: "Extra View"
-            option1: "TPMS"
-            option2: "RDU"
-            currentState: extraAreaView
-
-            MouseArea {
-                id: additioanlViewToggleMouseArea
-                anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    extraAreaViewToggle.currentState = (extraAreaViewToggle.currentState === extraAreaViewToggle.option1 ? extraAreaViewToggle.option2 : extraAreaViewToggle.option1);
-                    saveSettings()
-                }
-            }
-        }
-
         // Alone: lambda on the gauge page. Not Alone: the ESP32 stops
         // requesting lambda from the PCM so another OBD device can use it,
         // and the gauge page shows the RDU clutch temps instead.
@@ -214,11 +193,9 @@ Rectangle {
         content += "TemperatureUnit=" + temperatureToggle.currentState + "\n";
         content += "PressureUnit=" + pressureToggle.currentState + "\n";
         content += "TorqueUnit=" + torqueToggle.currentState + "\n";
-        content += "ExtraAreaView=" + extraAreaViewToggle.currentState + "\n";
         temperatureUnit = temperatureToggle.currentState
         pressureUnit = pressureToggle.currentState
         torqueUnit = torqueToggle.currentState
-        extraAreaView = extraAreaViewToggle.currentState
         xhr.send(content);
     }
 }

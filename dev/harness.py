@@ -299,6 +299,28 @@ def gauges_alone(h):
     h.check(h.eval("oilGauge.x === lambdaGauge.x && oilGauge.y < lambdaGauge.y"), "Oil sits directly above lambda")
     h.check(h.eval("oilGauge.currentValue") == 92, "oil temp received from the ESP32")
     h.check(abs(h.eval("lambdaGauge.currentValue") - 0.98) < 1e-9, "lambda received from the ESP32")
+    h.check(h.eval("frontLeftTireGauge.visible && rearRightTireGauge.visible"
+                   " && leftRDUTqGauge.visible && rightRDUTqGauge.visible"),
+            "tire pressures and RDU torque both shown")
+    h.check(h.eval("[leftRDUTqGauge.currentValue, rightRDUTqGauge.currentValue]") == [120, 135], "RDU torque received")
+    h.check(h.eval(
+        "(function() {"
+        "  var cx = lcGauge.x + lcGauge.width / 2, cy = lcGauge.y + lcGauge.height / 2;"
+        "  var lcRing = lcGauge.width / 2 - lcGauge.thick / 2;"
+        "  return [ptuGauge, oilGauge, rduGauge, lambdaGauge].every(function(g) {"
+        "    var dx = g.x + g.width / 2 - cx, dy = g.y + g.height / 2 - cy;"
+        "    return Math.sqrt(dx * dx + dy * dy) >= g.width / 2 - g.thick / 2 + lcRing;"
+        "  });"
+        "})()"), "LC sits between the four big gauges without touching their rings")
+    h.check(h.eval("nutronLogo.y + nutronLogo.height <= sensorArea.y"
+                   " && Math.abs(nutronLogo.x + nutronLogo.width / 2 - (sensorArea.x + sensorArea.width / 2)) < 1"
+                   " && nutronLogo.width * 1.1 <= sensorArea.width"),
+            "logo heads the right column and fits it at the top of its pulse")
+    h.check(h.eval("rightRDUTqGauge.mapToItem(null, 0, rightRDUTqGauge.height).y <= 480"), "torque row fits on screen")
+    h.check(h.eval("ptuGauge.showThresholdMarks && rduGauge.showThresholdMarks && oilGauge.showThresholdMarks"
+                   " && frontLeftTireGauge.showThresholdMarks && rearRightTireGauge.showThresholdMarks"
+                   " && !lambdaGauge.showThresholdMarks && !leftRDUTqGauge.showThresholdMarks"),
+            "low/high marks on the temperature and tire gauges, not lambda or torque")
     h.shot("gauges_alone")
 
 
@@ -309,7 +331,45 @@ def gauges_not_alone(h):
     h.check(h.eval("notAlone"), "app picked up Not Alone from the ESP32")
     h.check(h.eval("clutchTempGauge.visible && !lambdaGauge.visible"), "split clutch gauge shown in lambda's place")
     h.check(h.eval("[clutchTempGauge.leftValue, clutchTempGauge.rightValue]") == [71, 74], "left/right clutch temps")
+    h.check(h.eval("clutchTempGauge.caption") == "OBD\nNOT ALONE", "caption reads OBD / NOT ALONE")
     h.shot("gauges_not_alone")
+
+
+@scenario
+def rdu_row_toggle(h):
+    """Tapping the RDU Torque row switches it to the RDU clutch temps and back; the choice survives a page change."""
+    h.start_app(pids={"rdutl": 108, "rdutr": 98})  # left clutch over the 105 C red line, right under it
+    h.check(h.eval("leftRDUTqGauge.visible && !leftRDUTempGauge.visible && rduRowText.text === 'RDU\\nTorque'"),
+            "starts on RDU torque")
+    h.click("rduRowToggle")
+    h.check(h.eval("leftRDUTempGauge.visible && rightRDUTempGauge.visible && !leftRDUTqGauge.visible"),
+            "tap shows the clutch temps")
+    h.check(h.eval("rduRowText.text") == "RDU\nTemps", "label reads RDU / Temps")
+    h.check(h.eval("[leftRDUTempGauge.currentValue, rightRDUTempGauge.currentValue]") == [108, 98], "clutch temps received")
+    h.check(h.eval("leftRDUTempGauge.highTreshold === 105 && rightRDUTempGauge.highTreshold === 105"
+                   " && clutchTempGauge.highTreshold === 105"),
+            "clutch temp red line is 105 C on every clutch gauge")
+    h.check(not h.mock.posts, "switching sent nothing to the ESP32")
+    h.shot("rdu_temps")
+    h.goto_settings()
+    h.goto_gauges()
+    h.check(h.eval("leftRDUTempGauge.visible"), "still on clutch temps after visiting the other pages")
+    h.click("rduRowToggle")
+    h.check(h.eval("leftRDUTqGauge.visible && !leftRDUTempGauge.visible"), "tapping again goes back to torque")
+
+
+@scenario
+def tire_pressure_limits(h):
+    """Tire pressures go red below 35 psi and above 50 psi; 41-46 psi is normal."""
+    # The ESP32 sends bar: 2.30 = 33.4 psi (low), 3.03 = 43.9 psi, 3.52 = 51.1 psi (high), 3.38 = 49.0 psi
+    h.start_app(ini={"PressureUnit": "PSI"}, pids={"flw": 2.30, "frw": 3.03, "rlw": 3.52, "rrw": 3.38})
+    limits = h.eval("[frontLeftTireGauge.lowTreshold * 14.5038, frontLeftTireGauge.highTreshold * 14.5038]")
+    h.check(abs(limits[0] - 35) < 1e-9 and abs(limits[1] - 50) < 1e-9, "limits are 35 and 50 psi")
+    h.shot("tire_pressure_limits")  # rendering also sets each gauge's colour
+    colours = h.eval("[frontLeftTireGauge, frontRightTireGauge, rearLeftTireGauge, rearRightTireGauge]"
+                     ".map(function(g) { return String(g.colour); })")
+    red, blue = "#ce1845", "#0c32ff"
+    h.check(colours == [red, blue, red, blue], "33.4 psi red, 43.9 blue, 51.1 red, 49.0 blue")
 
 
 @scenario
@@ -323,6 +383,46 @@ def gauge_tap_does_nothing(h):
     h.click("clutchTempGauge")
     h.wait(300)
     h.check(not h.mock.posts, "tapping the split gauge sent nothing to the ESP32")
+
+
+@scenario
+def drive_modes_page(h):
+    """Drive mode page: Drift Stick Enabled + Drift In toggle on the left, ESP + auto start/stop under OTHERS."""
+    h.start_app(settings={"enableDriftMode": 1, "esp": 1, "disableStartStop": 1, "driftInAllModes": 1, "driveMode": 2})
+    h.click("nutronLogo")
+    h.goto_page("SecondaryView.qml")
+    h.check(h.eval("[driftStickGauge.currentValue, espGauge.currentValue, autoStartStopGauge.currentValue]") == [1, 1, 1],
+            "Drift Stick, ESP and auto start/stop show the ESP32's settings")
+    h.check(h.eval("driftInGauge.name + ' ' + driftInGauge.statusText") == "All Modes", "Drift In toggle shows All Modes")
+    h.check(h.eval("driftStickText.y === othersText.y"), "DRIFT STICK and OTHERS headings line up")
+    h.check(h.eval("driftStickGauge.x + driftStickGauge.width === driftInGauge.x"
+                   " && driftStickGauge.width === 120 && driftInGauge.width === 120"),
+            "full-size Drift Stick Enabled button, with the Drift In toggle right of it")
+    h.check(h.eval("driftInGauge.x + driftInGauge.width"
+                   " <= nutronLogo2.x + nutronLogo2.width / 2 - nutronLogo2.width * 1.1 / 2"),
+            "left side clears the logo at the top of its pulse")
+    h.shot("drive_modes")
+
+    h.click("driftInGauge")
+    h.wait(300)
+    h.check(h.mock.posts[-1:] == [{"driftInAllModes": 0}], "tapping the toggle sent driftInAllModes=0")
+    h.check(h.eval("driftInGauge.name + ' ' + driftInGauge.statusText") == "Drift Mode Only", "toggle now shows Drift Mode Only")
+
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.check(h.mock.posts[-1:] == [{"enableDriftMode": 0}], "tapping Drift Stick Enabled turned it off")
+    h.check(h.eval("driftInGauge.opacity") < 1, "Drift In toggle dimmed while Drift Stick is off")
+    posts_before = len(h.mock.posts)
+    h.click("driftInGauge")
+    h.wait(300)
+    h.check(len(h.mock.posts) == posts_before and h.eval("driftInGauge.name") == "Drift",
+            "Drift In toggle can't be changed while Drift Stick is off")
+    h.shot("drive_modes_stick_off")
+
+    for item, key in (("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
+        h.click(item)
+        h.wait(300)
+        h.check(h.mock.posts[-1:] == [{key: 0}], "tapping %s turned %s off" % (item, key))
 
 
 @scenario
@@ -416,11 +516,11 @@ def settings_units_saved(h):
 
 @scenario
 def imperial_not_alone(h):
-    """Fahrenheit/PSI/Lb-Ft, RDU extra view, hot clutches: worst case for text fit."""
-    h.start_app(ini={"TemperatureUnit": "Fahrenheit", "PressureUnit": "PSI", "TorqueUnit": "Lb-Ft",
-                     "ExtraAreaView": "RDU"},
-                settings={"cobbFriendly": 1}, pids={"rdutl": 118, "rdutr": 125, "engine": 121})
-    h.check(h.eval("extraAreaView") == "RDU", "RDU extra view loaded from the ini")
+    """Fahrenheit/PSI/Lb-Ft, hot clutches, big torque: worst case for text fit."""
+    h.start_app(ini={"TemperatureUnit": "Fahrenheit", "PressureUnit": "PSI", "TorqueUnit": "Lb-Ft"},
+                settings={"cobbFriendly": 1},
+                pids={"rdutl": 118, "rdutr": 125, "engine": 121, "rdutql": 1550, "rdutqr": 1480})
+    h.check(h.eval("temperatureUnit") == "Fahrenheit", "imperial units loaded from the ini")
     h.shot("imperial_not_alone")
 
 

@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 DEFAULT_PIDS = {
     "ptu": 62, "rdu": 58, "engine": 92, "lambda": 0.98,
-    "flw": 2.4, "frw": 2.4, "rlw": 2.3, "rrw": 2.3,       # bar
+    "flw": 3.0, "frw": 3.0, "rlw": 2.95, "rrw": 2.95,     # bar (about 43 psi)
     "rdutl": 71, "rdutr": 74,                             # RDU clutch temps, C
     "rdutql": 120, "rdutqr": 135,                         # RDU clutch torque, Nm
 }

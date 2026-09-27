@@ -37,8 +37,7 @@ Rectangle {
     ]
 
     property var settingsData: [
-        { gaugeId: lcGauge,             param: "enableLC" },
-        { gaugeId: espGauge,           param: "esp" }
+        { gaugeId: lcGauge,             param: "enableLC" }
     ]
 
     Image {
@@ -129,12 +128,13 @@ Rectangle {
 
     Image {
         id: nutronLogo
-        height: 47
-        anchors.centerIn: parent
+        // Heads the right column; LC has the spot between the big gauges.
+        height: 50
+        anchors.top: parent.top
+        anchors.topMargin: 40
+        anchors.horizontalCenter: sensorArea.horizontalCenter
         fillMode: Image.PreserveAspectFit
         source: "res/nutron.png"
-        anchors.verticalCenterOffset: 8
-        anchors.horizontalCenterOffset: -135
         smooth: true
         mipmap: true
 
@@ -312,7 +312,7 @@ Rectangle {
 
         thick: 24
 
-        caption: "NOT ALONE"
+        caption: "OBD\nNOT ALONE"
         captionColor: "#329BFD"
         captionSize: 14
 
@@ -328,29 +328,30 @@ Rectangle {
         decimal: 0
         measureType: "temperature"
 
-        // Same scale as the clutch temp gauges in the RDU extra area
+        // Clutch temps: 0-120 C scale, red line at 105 C per clutch
         minValue: 0
         maxValue: 120
 
         lowTreshold: 0
-        highTreshold: 120
+        highTreshold: 105
 
         leftValue: leftRDUTempGauge.currentValue
         rightValue: rightRDUTempGauge.currentValue
     }
 
+    // In the gap between the four big gauges, sized to clear their rings
     ButtonGauge {
         id: lcGauge
-        anchors.top: oilGauge.top
-        anchors.left: oilGauge.right
-        anchors.leftMargin: 10
+        anchors.centerIn: parent
+        anchors.horizontalCenterOffset: -135
+        anchors.verticalCenterOffset: 8
         width: size
         height: size
-        size: 110
-        thick: 12
+        size: 90
+        thick: 11
 
         name: "LC"
-        nameSize: 23
+        nameSize: 21
 
         primaryColor: "#3bb539"
 
@@ -372,55 +373,21 @@ Rectangle {
         }
     }
 
-    ButtonGauge {
-        id: espGauge
-        anchors.leftMargin: 30
-        anchors.top: lcGauge.top
-        anchors.left: lcGauge.right
-        height: size
-        width: size
-
-        name: "ESP"
-        statusText: "Sport"
-        primaryColor: "#3bb539"
-        nameSize: 22
-
-        size: 110
-        thick: 12
-
-        minValue: 0
-        maxValue: 1
-        showStatus: 1
-
-        startAngleDegrees: 0
-        endAngleDegrees: 360
-
-        MouseArea {
-            id: espButton
-            anchors.fill: parent
-            onClicked: {
-                var newValue = espGauge.currentValue ? 0 : 1
-                console.log("Current value: " + espGauge.currentValue + " New Value: " +newValue)
-                Controller.sendData("settings", "esp", newValue, espGauge, false)
-            }
-        }
-    }
-
-    Rectangle {
-        id: extraTPMSArea
-        anchors.top: lcGauge.bottom
-        anchors.left: lcGauge.left
-        anchors.bottom: lambdaGauge.bottom
-        anchors.right: espGauge.right
-
-        color: "transparent"
-        visible: extraAreaView === "TPMS"
+    // Tire pressures and RDU torque under the logo, all shown at once (this
+    // used to switch between TPMS and RDU with the Extra View setting).
+    Item {
+        id: sensorArea
+        anchors.top: nutronLogo.bottom
+        anchors.left: oilGauge.right
+        anchors.leftMargin: 10
+        anchors.bottom: parent.bottom
+        width: 250
 
         SemiCircularGauge {
             id: frontLeftTireGauge
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: 40
+            anchors.topMargin: 14
 
             width: size
             height: size
@@ -437,8 +404,10 @@ Rectangle {
             decimal: 1
             measureType: "pressure"
 
-            lowTreshold: 1.9
-            highTreshold: 3.0
+            // Values are in bar; limits set in psi
+            lowTreshold: 35 / 14.5038
+            highTreshold: 50 / 14.5038
+            showThresholdMarks: true
 
             startAngleDegrees: 70
             endAngleDegrees: 290
@@ -477,8 +446,10 @@ Rectangle {
             decimal: 1
             measureType: "pressure"
 
-            lowTreshold: 1.9
-            highTreshold: 3.0
+            // Values are in bar; limits set in psi
+            lowTreshold: 35 / 14.5038
+            highTreshold: 50 / 14.5038
+            showThresholdMarks: true
 
             startAngleDegrees: 110
             endAngleDegrees: 250
@@ -486,31 +457,25 @@ Rectangle {
             reverse: true
         }
 
+        // Between the front and rear rows
         Text {
             id: tpmsText
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: frontLeftTireGauge.bottom
+            anchors.verticalCenterOffset: 9
 
             font.weight: Font.Bold
             font.pixelSize: 23
             horizontalAlignment: Text.AlignHCenter
             color: "#F8E63C"
             text: "TPMS"
-
-            MouseArea {
-                id: rduTpmsSwitcher2MouseArea
-                anchors.fill: parent
-                onClicked: {
-                    extraTPMSArea.visible = false
-                    extraRDUArea.visible = true
-                }
-            }
         }
 
         SemiCircularGauge {
             id: rearLeftTireGauge
             anchors.left: frontLeftTireGauge.left
             anchors.top: frontLeftTireGauge.bottom
-            anchors.topMargin: 40
+            anchors.topMargin: 18
 
             width: size
             height: size
@@ -527,8 +492,10 @@ Rectangle {
             decimal: 1
             measureType: "pressure"
 
-            lowTreshold: 1.9
-            highTreshold: 3.0
+            // Values are in bar; limits set in psi
+            lowTreshold: 35 / 14.5038
+            highTreshold: 50 / 14.5038
+            showThresholdMarks: true
 
             startAngleDegrees: 70
             endAngleDegrees: 290
@@ -544,7 +511,6 @@ Rectangle {
             color: "#F8E63C"
             text: "Rear"
         }
-
 
         SemiCircularGauge {
             id: rearRightTireGauge
@@ -567,93 +533,10 @@ Rectangle {
             decimal: 1
             measureType: "pressure"
 
-            lowTreshold: 1.9
-            highTreshold: 3.0
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
-        }
-    }
-
-    Rectangle {
-        id: extraRDUArea
-        anchors.top: lcGauge.bottom
-        anchors.left: lcGauge.left
-        anchors.bottom: lambdaGauge.bottom
-        anchors.right: espGauge.right
-
-        color: "transparent"
-        visible: extraAreaView === "RDU"
-
-        SemiCircularGauge {
-            id: leftRDUTempGauge
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.topMargin: 40
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 120
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        Text {
-            id: rduTempText
-            anchors.centerIn: leftRDUTempGauge
-            anchors.horizontalCenterOffset: 70
-
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "Temp"
-        }
-
-        SemiCircularGauge {
-            id: rightRDUTempGauge
-            anchors.bottom: leftRDUTempGauge.bottom
-            anchors.left: leftRDUTempGauge.right
-            anchors.leftMargin: 30
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 120
+            // Values are in bar; limits set in psi
+            lowTreshold: 35 / 14.5038
+            highTreshold: 50 / 14.5038
+            showThresholdMarks: true
 
             startAngleDegrees: 110
             endAngleDegrees: 250
@@ -661,31 +544,13 @@ Rectangle {
             reverse: true
         }
 
-        Text {
-            id: rduText
-            anchors.centerIn: parent
-
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "RDU"
-
-            MouseArea {
-                id: rduTpmsSwitcher1MouseArea
-                anchors.fill: parent
-                onClicked: {
-                    extraTPMSArea.visible = true
-                    extraRDUArea.visible = false
-                }
-            }
-        }
-
+        // Bottom row: RDU torque, or the RDU clutch temps - tap to switch
         SemiCircularGauge {
             id: leftRDUTqGauge
-            anchors.left: leftRDUTempGauge.left
-            anchors.top: leftRDUTempGauge.bottom
-            anchors.topMargin: 40
+            anchors.left: rearLeftTireGauge.left
+            anchors.top: rearLeftTireGauge.bottom
+            anchors.topMargin: 18
+            visible: !showRDUTemps
 
             width: size
             height: size
@@ -710,22 +575,22 @@ Rectangle {
         }
 
         Text {
-            id: rearRDUText
-            anchors.centerIn: rightRDUTqGauge
-            anchors.horizontalCenterOffset: -70
+            id: rduRowText
+            anchors.centerIn: leftRDUTqGauge
+            anchors.horizontalCenterOffset: 70
             font.weight: Font.Bold
-            font.pixelSize: 21
+            font.pixelSize: 18
             horizontalAlignment: Text.AlignHCenter
             color: "#F8E63C"
-            text: "Torque"
+            text: showRDUTemps ? "RDU\nTemps" : "RDU\nTorque"
         }
-
 
         SemiCircularGauge {
             id: rightRDUTqGauge
             anchors.top: leftRDUTqGauge.top
             anchors.left: leftRDUTqGauge.right
             anchors.leftMargin: 30
+            visible: !showRDUTemps
 
             width: size
             height: size
@@ -749,6 +614,80 @@ Rectangle {
             endAngleDegrees: 250
 
             reverse: true
+        }
+
+        // RDU clutch temps: 0-120 C scale, red line at 105 C. These also
+        // feed the split gauge that replaces lambda in OBD Not Alone
+        // mode, so they get updated even while hidden.
+        SemiCircularGauge {
+            id: leftRDUTempGauge
+            anchors.left: leftRDUTqGauge.left
+            anchors.top: leftRDUTqGauge.top
+            visible: showRDUTemps
+
+            width: size
+            height: size
+            size: 110
+            thick: 12
+
+            unitSymbol: "°"
+
+            primaryColor: "#0c32ff"
+            secondaryColor: "#ce1845"
+
+            valueSize: 23
+            minValue: 0
+            maxValue: 120
+
+            decimal: 0
+            measureType: "temperature"
+
+            lowTreshold: 0
+            highTreshold: 105
+
+            startAngleDegrees: 70
+            endAngleDegrees: 290
+        }
+
+        SemiCircularGauge {
+            id: rightRDUTempGauge
+            anchors.left: rightRDUTqGauge.left
+            anchors.top: rightRDUTqGauge.top
+            visible: showRDUTemps
+
+            width: size
+            height: size
+            size: 110
+            thick: 12
+
+            unitSymbol: "°"
+
+            primaryColor: "#0c32ff"
+            secondaryColor: "#ce1845"
+
+            valueSize: 23
+            minValue: 0
+            maxValue: 120
+
+            decimal: 0
+            measureType: "temperature"
+
+            lowTreshold: 0
+            highTreshold: 105
+
+            startAngleDegrees: 110
+            endAngleDegrees: 250
+
+            reverse: true
+        }
+
+        MouseArea {
+            id: rduRowToggle
+            anchors.left: leftRDUTqGauge.left
+            anchors.right: rightRDUTqGauge.right
+            anchors.top: leftRDUTqGauge.top
+            anchors.bottom: leftRDUTqGauge.bottom
+            onClicked: showRDUTemps = !showRDUTemps
         }
     }
 

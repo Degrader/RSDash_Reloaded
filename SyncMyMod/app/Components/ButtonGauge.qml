@@ -26,6 +26,11 @@ Rectangle {
     property int nameSize
     property int valueSize
 
+    // Vertical positions of the name and status text, e.g. to fit a
+    // two-line name or an icon above the status.
+    property int nameOffset: 0
+    property int statusOffset: 15
+
     property real minValue
     property real maxValue
     property real startAngleDegrees
@@ -79,6 +84,7 @@ Rectangle {
         Text {
             id: gaugeNameText
             anchors.centerIn: buttonGaugeCanvas
+            anchors.verticalCenterOffset: nameOffset
             font.pixelSize: nameSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
@@ -89,7 +95,7 @@ Rectangle {
         Text {
             id: gaugeStatusText
             anchors.centerIn: buttonGaugeCanvas
-            anchors.verticalCenterOffset: 15
+            anchors.verticalCenterOffset: statusOffset
             font.pixelSize: 10
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter

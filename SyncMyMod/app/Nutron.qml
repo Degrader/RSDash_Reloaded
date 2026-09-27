@@ -27,12 +27,15 @@ Rectangle {
     property string temperatureUnit
     property string pressureUnit
     property string torqueUnit
-    property string extraAreaView
 
     // OBD "Not Alone" mode: the ESP32 stops requesting lambda from the PCM
     // so another OBD device (COBB AP, scan tool) can use it. Stored on the
     // ESP32 as cobbFriendly, not in the ini; set on the settings page.
     property bool notAlone: false
+
+    // Main view's bottom-right row: RDU clutch temps instead of RDU torque.
+    // Kept here so it survives switching pages; resets on app start.
+    property bool showRDUTemps: false
 
     property bool rtrDisplayed: false
 

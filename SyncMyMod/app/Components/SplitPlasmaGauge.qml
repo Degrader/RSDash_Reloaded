@@ -32,6 +32,9 @@ Rectangle {
     property real lowTreshold
     property real highTreshold
 
+    // Blue/red marks on each half at lowTreshold/highTreshold
+    property bool showThresholdMarks: measureType === "temperature"
+
     // Degrees left clear between the two halves, at both top and bottom.
     property real gapDegrees: 20
 
@@ -81,7 +84,15 @@ Rectangle {
                 ctx.arc(centerX, centerY, radius, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, rightSide);
                 ctx.stroke();
 
+                if (showThresholdMarks) {
+                    Controller.drawThresholdMarks(ctx, centerX, centerY, radius, thick, function(value) {
+                        var n = (value - minValue) / (maxValue - minValue);
+                        return startAngle + (rightSide ? -n : n) * span;
+                    });
+                }
+
                 ctx.fillStyle = "#2A2A2A";
+                ctx.strokeStyle = colour;
                 ctx.lineWidth = 5;
                 ctx.beginPath();
                 ctx.arc(centerX + radius * Math.cos(progressAngle * Math.PI / 180), centerY + radius * Math.sin(progressAngle * Math.PI / 180), indicatorRadius, 0, 2 * Math.PI);

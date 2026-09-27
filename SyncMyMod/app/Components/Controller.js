@@ -40,8 +40,6 @@ function loadSettings() {
                         pressureUnit = line.split("=")[1];
                     } else if (line.indexOf("TorqueUnit=") === 0) {
                         torqueUnit = line.split("=")[1];
-                    } else if (line.indexOf("ExtraAreaView=") === 0) {
-                        extraAreaView = line.split("=")[1];
                     }
                 }
             } else {
@@ -218,9 +216,40 @@ function getValue(value) {
     return (typeof factor === "function" ? factor(value) : value * factor).toFixed(decimal);
 }
 
+var COLD_MARK_COLOUR = "#329BFD";
+var HOT_MARK_COLOUR = "#FF3B3B";
+
+// Draws short lines across a gauge's ring where the value turns "cold"
+// (lowTreshold, blue) and "hot" (highTreshold, red). angleFor(value) maps a
+// value to its canvas angle in degrees. A threshold at or past either end of
+// the scale is skipped, since it would only mark the end of the arc.
+function drawThresholdMarks(ctx, centerX, centerY, ringRadius, thick, angleFor) {
+    var marks = [[lowTreshold, COLD_MARK_COLOUR], [highTreshold, HOT_MARK_COLOUR]];
+    for (var i = 0; i < marks.length; ++i) {
+        var value = marks[i][0];
+        if (value <= minValue || value >= maxValue) continue;
+
+        var angle = angleFor(value) * Math.PI / 180;
+        var inner = ringRadius - thick / 2 - 3;
+        var outer = ringRadius + thick / 2 + 3;
+        // Dark outline first, so the mark shows over an arc of any colour
+        var strokes = [["#000000", 7], [marks[i][1], 4]];
+        for (var j = 0; j < strokes.length; ++j) {
+            ctx.strokeStyle = strokes[j][0];
+            ctx.lineWidth = strokes[j][1];
+            ctx.lineCap = "butt";
+            ctx.beginPath();
+            ctx.moveTo(centerX + inner * Math.cos(angle), centerY + inner * Math.sin(angle));
+            ctx.lineTo(centerX + outer * Math.cos(angle), centerY + outer * Math.sin(angle));
+            ctx.stroke();
+        }
+    }
+}
+
+// Lights the drive mode button matching the startup drive mode. (The Drift
+// In toggle reads dummyDriftInGauge itself, so it isn't handled here.)
 function checkDummyGauges() {
     var sdm = dummySDMGauge.currentValue;
-    var diam = dummyDriftInGauge.currentValue;
     var sdmGauges = [
         normalModeGauge,
         sportModeGauge,
@@ -230,20 +259,10 @@ function checkDummyGauges() {
         lastModeGauge
     ];
 
-    var diamGauges = [
-        driftInDriftModeOnlyGauge,
-        driftInAllModesGauge
-    ];
-
-    diamGauges.forEach(function(gauge) { gauge.currentValue = 0; });
     sdmGauges.forEach(function(gauge) { gauge.currentValue = 0; });
 
     if (sdm >= 0 && sdm < sdmGauges.length) {
         sdmGauges[sdm].currentValue = 1;
-    }
-
-    if (diam >= 0 && diam < diamGauges.length) {
-        diamGauges[diam].currentValue = 1;
     }
 }
 

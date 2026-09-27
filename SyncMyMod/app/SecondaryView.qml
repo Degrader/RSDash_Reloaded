@@ -20,7 +20,8 @@ Rectangle {
     color: "black"
 
     property var settingsData: [
-        { gaugeId: driftGauge,       param: "enableDriftMode" },
+        { gaugeId: driftStickGauge,     param: "enableDriftMode" },
+        { gaugeId: espGauge,            param: "esp" },
         { gaugeId: autoStartStopGauge,  param: "disableStartStop" },
         { gaugeId: dummySDMGauge,       param: "driveMode" },
         { gaugeId: dummyDriftInGauge,   param: "driftInAllModes" }
@@ -273,31 +274,35 @@ Rectangle {
     }
 
     Text {
-        id: driftInText
-        anchors.horizontalCenter: driftInDriftModeOnlyGauge.horizontalCenter
-        anchors.horizontalCenterOffset: -driftInDriftModeOnlyGauge.width / 2
-        anchors.bottom: driftInDriftModeOnlyGauge.top
+        id: driftStickText
+        anchors.horizontalCenter: driftInGauge.horizontalCenter
+        anchors.horizontalCenterOffset: -driftInGauge.width / 2
+        anchors.bottom: driftInGauge.top
         anchors.bottomMargin: 10
         font.weight: Font.Bold
         font.pixelSize: 30
         horizontalAlignment: Text.AlignHCenter
         color: "#329BFD"
-        text: "DRIFT IN"
+        text: "DRIFT STICK"
     }
 
     ButtonGauge {
-        id: driftInDriftModeOnlyGauge
-        anchors.centerIn: nutronLogo2
-        anchors.horizontalCenterOffset: -200
+        id: driftStickGauge
+        anchors.verticalCenter: driftInGauge.verticalCenter
+        anchors.right: driftInGauge.left
         height: size
         width: size
 
-        name: "Drift"
+        name: "Drift\nStick"
+        nameOffset: -6
+        statusText: "Enabled"
+        statusOffset: 25
         primaryColor: "#3bb539"
-        nameSize: 23
+        nameSize: 18
 
         size: 120
         thick: 14
+        showStatus: 1
 
         minValue: 0
         maxValue: 1
@@ -306,28 +311,38 @@ Rectangle {
         endAngleDegrees: 360
 
         MouseArea {
-            id: driftInDriftModeOnlyButton
+            id: driftStickButton
             anchors.fill: parent
             onClicked: {
-                var driftMode = 0
-                Controller.sendData("settings", "driftInAllModes", driftMode, dummyDriftInGauge, true)
+                var newValue = driftStickGauge.currentValue ? 0 : 1
+                Controller.sendData("settings", "enableDriftMode", newValue, driftStickGauge, false)
             }
         }
     }
 
+    // Which drive modes Drift Stick works in: all of them, or Drift only.
+    // The setting itself lives in dummyDriftInGauge. The ring lights while
+    // Drift Stick is enabled; while it's disabled this is dimmed and can't
+    // be changed.
     ButtonGauge {
-        id: driftInAllModesGauge
-        anchors.verticalCenter: driftInDriftModeOnlyGauge.verticalCenter
-        anchors.right: driftInDriftModeOnlyGauge.left
+        id: driftInGauge
+        anchors.centerIn: nutronLogo2
+        anchors.horizontalCenterOffset: -200
         height: size
         width: size
+        opacity: driftStickGauge.currentValue ? 1.0 : 0.4
 
-        name: "All"
+        readonly property bool allModes: dummyDriftInGauge.currentValue === 1
+
+        name: allModes ? "All" : "Drift"
+        statusText: allModes ? "Modes" : "Mode Only"
         primaryColor: "#3bb539"
         nameSize: 23
+        currentValue: driftStickGauge.currentValue
 
         size: 120
         thick: 14
+        showStatus: 1
 
         minValue: 0
         maxValue: 1
@@ -336,20 +351,21 @@ Rectangle {
         endAngleDegrees: 360
 
         MouseArea {
-            id: driftInAllModesButton
+            id: driftInButton
             anchors.fill: parent
+            enabled: driftStickGauge.currentValue === 1
             onClicked: {
-                var driftMode = 1
-                Controller.sendData("settings", "driftInAllModes", driftMode, dummyDriftInGauge, true)
+                var driftMode = driftInGauge.allModes ? 0 : 1
+                Controller.sendData("settings", "driftInAllModes", driftMode, dummyDriftInGauge, false)
             }
         }
     }
 
     Text {
         id: othersText
-        anchors.horizontalCenter: driftGauge.horizontalCenter
-        anchors.horizontalCenterOffset: driftGauge.width / 2
-        anchors.bottom: driftGauge.top
+        anchors.horizontalCenter: espGauge.horizontalCenter
+        anchors.horizontalCenterOffset: espGauge.width / 2
+        anchors.bottom: espGauge.top
         anchors.bottomMargin: 10
         font.weight: Font.Bold
         font.pixelSize: 30
@@ -358,45 +374,16 @@ Rectangle {
         text: "OTHERS"
     }
 
+    // Same setting as the ESP button on the main page
     ButtonGauge {
-        id: driftGauge
+        id: espGauge
         anchors.centerIn: nutronLogo2
         anchors.horizontalCenterOffset: 200
         height: size
         width: size
 
-        name: "DRIFT\nFURY"
-        primaryColor: "#3bb539"
-        nameSize: 14
-
-        size: 120
-        thick: 14
-
-        minValue: 0
-        maxValue: 1
-
-        startAngleDegrees: 0
-        endAngleDegrees: 360
-
-        MouseArea {
-            id: driftButton
-            anchors.fill: parent
-            onClicked: {
-                var newValue = driftGauge.currentValue ? 0 : 1
-                Controller.sendData("settings", "enableDriftMode", newValue, driftGauge, false)
-            }
-        }
-    }
-
-    ButtonGauge {
-        id: autoStartStopGauge
-        anchors.verticalCenter: driftGauge.verticalCenter
-        anchors.left: driftGauge.right
-        height: size
-        width: size
-
-        name: "ASS"
-        statusText: "OFF"
+        name: "ESP"
+        statusText: "Sport"
         primaryColor: "#3bb539"
         nameSize: 22
 
@@ -409,6 +396,44 @@ Rectangle {
 
         startAngleDegrees: 0
         endAngleDegrees: 360
+
+        MouseArea {
+            id: espButton
+            anchors.fill: parent
+            onClicked: {
+                var newValue = espGauge.currentValue ? 0 : 1
+                Controller.sendData("settings", "esp", newValue, espGauge, false)
+            }
+        }
+    }
+
+    ButtonGauge {
+        id: autoStartStopGauge
+        anchors.verticalCenter: espGauge.verticalCenter
+        anchors.left: espGauge.right
+        height: size
+        width: size
+
+        statusText: "OFF"
+        statusOffset: 29
+        primaryColor: "#3bb539"
+
+        size: 120
+        thick: 14
+        showStatus: 1
+
+        minValue: 0
+        maxValue: 1
+
+        startAngleDegrees: 0
+        endAngleDegrees: 360
+
+        StartStopIcon {
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: -4
+            width: 54
+            height: 54
+        }
 
         MouseArea {
             id: autoStartStopButton

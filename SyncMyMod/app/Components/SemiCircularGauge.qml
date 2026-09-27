@@ -42,6 +42,9 @@ Rectangle {
     property bool reverse: false
     property bool ignoreUnit: false
 
+    // Blue/red marks on the ring at lowTreshold/highTreshold
+    property bool showThresholdMarks: measureType === "temperature"
+
     property real currentValue: 0
 
     // Repaint only on actual value changes, and skip repainting entirely
@@ -91,6 +94,13 @@ Rectangle {
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
                 ctx.stroke();
+
+                if (showThresholdMarks) {
+                    Controller.drawThresholdMarks(ctx, centerX, centerY, radius - thick, thick, function(value) {
+                        var n = (value - minValue) / (maxValue - minValue);
+                        return startAngle + (reverse ? -n : n) * delta;
+                    });
+                }
 
                 if (measureType != "torque" && currentValue != 0) {
                     ctx.fillStyle = "#2A2A2A";
