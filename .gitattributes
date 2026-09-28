@@ -1,0 +1,4 @@
+# The SYNC 3 head unit runs autoinstall.sh with its own shell, which fails on CRLF line endings.
+*.sh  text eol=lf
+# Controller.js parses NutronConfig.ini by splitting on "\n", so CRLF would leave "\r" in every value.
+*.ini text eol=lf
