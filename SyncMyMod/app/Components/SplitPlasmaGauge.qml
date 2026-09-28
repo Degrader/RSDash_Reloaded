@@ -64,7 +64,6 @@ Rectangle {
                 var centerX = width / 2;
                 var centerY = height / 2;
                 var radius = Math.min(centerX, centerY) - thick;
-                var indicatorRadius = 14;
 
                 var span = 180 - 2 * gapDegrees;
                 var startAngle = rightSide ? 90 - gapDegrees : 90 + gapDegrees;
@@ -82,10 +81,7 @@ Rectangle {
                 ctx.arc(centerX, centerY, radius, startAngle * Math.PI / 180, endAngle * Math.PI / 180, rightSide);
                 ctx.stroke();
 
-                ctx.strokeStyle = colour;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, rightSide);
-                ctx.stroke();
+                Controller.drawValueArc(ctx, centerX, centerY, radius, thick, startAngle, progressAngle, rightSide, colour);
 
                 if (showThresholdMarks) {
                     Controller.drawThresholdMarks(ctx, centerX, centerY, radius, thick, function(value) {
@@ -93,14 +89,6 @@ Rectangle {
                         return startAngle + (rightSide ? -n : n) * span;
                     });
                 }
-
-                ctx.fillStyle = "#2A2A2A";
-                ctx.strokeStyle = colour;
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.arc(centerX + radius * Math.cos(progressAngle * Math.PI / 180), centerY + radius * Math.sin(progressAngle * Math.PI / 180), indicatorRadius, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.stroke();
             }
 
             onPaint: {

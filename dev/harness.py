@@ -323,29 +323,41 @@ def gauges_alone(h):
             "big gauges and the right column fit side by side on 800 px")
     h.check(h.eval("rduGauge.y >= ptuGauge.y + ptuGauge.height && rduGauge.y + rduGauge.height <= 480"),
             "both rows of big gauges fit on 480 px")
+    # The top rings are open at the bottom, so the free space between the
+    # four gauges runs from the lowest point of the top rings (their ends) to
+    # the highest point of the bottom rings
     h.check(h.eval("(function() {"
-                   "  var cx = (ptuGauge.x + oilGauge.x + oilGauge.width) / 2, cy = (ptuGauge.y + rduGauge.y + rduGauge.height) / 2;"
+                   "  var g = ptuGauge, a = g.startAngleDegrees * Math.PI / 180;"
+                   "  var topRingsBottom = g.y + g.height / 2 + (g.width / 2 - g.thick) * Math.sin(a) + g.thick / 2;"
+                   "  var bottomRingsTop = rduGauge.y + rduGauge.thick / 2;"
+                   "  var cx = (ptuGauge.x + oilGauge.x + oilGauge.width) / 2, cy = (topRingsBottom + bottomRingsTop) / 2;"
                    "  return Math.abs(nutronLogo.x + nutronLogo.width / 2 - cx) < 1"
                    "      && Math.abs(nutronLogo.y + nutronLogo.height / 2 - cy) < 1; })()"),
-            "logo centred between the four big gauges")
-    # The visible part of the logo at its 1.1x pulse vs each ring's outer
-    # edge, counting the indicator dot (radius 14, 5 px stroke) that rides on
-    # the ring. The logo scales about its centre.
+            "logo centred in the free space between the four big gauges")
+    # The visible part of the logo at its 1.1x pulse vs each ring as drawn:
+    # its arc, the ring's thickness, and the 3 px the threshold marks stick
+    # out past it. The logo scales about its centre.
     left, top, right, bottom = opaque_bounds(APP / "res" / "nutron.png")
-    h.check(h.eval("(function() {"
-                   "  var s = 1.1, iw = nutronLogo.sourceSize.width, ih = nutronLogo.sourceSize.height;"
-                   "  var k = nutronLogo.paintedHeight / ih;"
-                   "  var cx = nutronLogo.x + nutronLogo.width / 2, cy = nutronLogo.y + nutronLogo.height / 2;"
-                   "  var lx = cx + ((%f + %f) / 2 - iw / 2) * k * s, ly = cy + ((%f + %f) / 2 - ih / 2) * k * s;"
-                   "  var hw = (%f - %f) / 2 * k * s, hh = (%f - %f) / 2 * k * s;"
-                   % (left, right, top, bottom, right, left, bottom, top) +
-                   "  return [ptuGauge, oilGauge, rduGauge, lambdaGauge].every(function(g) {"
-                   "    var dx = Math.max(0, Math.abs(g.x + g.width / 2 - lx) - hw);"
-                   "    var dy = Math.max(0, Math.abs(g.y + g.height / 2 - ly) - hh);"
-                   "    return Math.sqrt(dx * dx + dy * dy) >= g.width / 2 - g.thick + 14 + 2.5;"
-                   "  });"
-                   "})()"),
-            "logo clears all four rings and indicator dots at the top of its pulse")
+    clearance = h.eval("(function() {"
+                       "  var s = 1.1, iw = nutronLogo.sourceSize.width, ih = nutronLogo.sourceSize.height;"
+                       "  var k = nutronLogo.paintedHeight / ih;"
+                       "  var cx = nutronLogo.x + nutronLogo.width / 2, cy = nutronLogo.y + nutronLogo.height / 2;"
+                       "  var lx = cx + ((%f + %f) / 2 - iw / 2) * k * s, ly = cy + ((%f + %f) / 2 - ih / 2) * k * s;"
+                       "  var hw = (%f - %f) / 2 * k * s, hh = (%f - %f) / 2 * k * s;"
+                       % (left, right, top, bottom, right, left, bottom, top) +
+                       "  var least = 1e9;"
+                       "  [ptuGauge, oilGauge, rduGauge, lambdaGauge].forEach(function(g) {"
+                       "    var r = g.width / 2 - g.thick, gx = g.x + g.width / 2, gy = g.y + g.height / 2;"
+                       "    for (var d = g.startAngleDegrees; d <= g.endAngleDegrees; d += 0.25) {"
+                       "      var px = gx + r * Math.cos(d * Math.PI / 180), py = gy + r * Math.sin(d * Math.PI / 180);"
+                       "      var dx = Math.max(0, Math.abs(px - lx) - hw), dy = Math.max(0, Math.abs(py - ly) - hh);"
+                       "      least = Math.min(least, Math.sqrt(dx * dx + dy * dy) - g.thick / 2 - 3);"
+                       "    }"
+                       "  });"
+                       "  return least;"
+                       "})()")
+    h.check(clearance >= 8, "logo clears all four rings and marks by %.1f px at the top of its pulse (at least 8)" % clearance)
+    h.check(h.eval("nutronLogo.height") == 80, "logo is 80 px tall")
     h.check(h.eval("pulseTimer.running && pulseTimer.repeat && nutronLogo.scale !== 1"), "logo is pulsing")
     h.check(h.eval("settingsButton.x >= closeButton.x + closeButton.width && settingsButton.y === closeButton.y"
                    " && settingsButton.x + settingsButton.width <= ptuGauge.x"),
@@ -431,6 +443,47 @@ def torque_split_idle(h):
 
 
 @scenario
+def value_cutoff(h):
+    """A gauge's coloured bar is cut flat, straight across the ring, exactly at its value; no indicator circle."""
+    h.start_app(pids={"ptu": 65})
+    h.wait(300)
+    # Points on PTU's ring, d px along the ring from angle `at` (positive is
+    # towards higher values) and `across` px out from the ring's centre line
+    probe = ("(function(at, d, across) { var g = ptuGauge;"
+             "  var a = at * Math.PI / 180, r = Math.min(g.width, g.height) / 2 - g.thick + across;"
+             "  var p = g.mapToItem(null, g.width / 2 + r * Math.cos(a) - d * Math.sin(a),"
+             "                            g.height / 2 + r * Math.sin(a) + d * Math.cos(a));"
+             "  return [p.x, p.y]; })")
+    value_angle = h.eval("ptuGauge.startAngleDegrees + (ptuGauge.currentValue - ptuGauge.minValue)"
+                         " / (ptuGauge.maxValue - ptuGauge.minValue)"
+                         " * (ptuGauge.endAngleDegrees - ptuGauge.startAngleDegrees)")
+    start_angle = h.eval("ptuGauge.startAngleDegrees")
+
+    def colour_at(at, d, across):
+        x, y = h.eval("%s(%f, %f, %f)" % (probe, at, d, across))
+        return image.pixelColor(int(round(x)), int(round(y))).name()
+
+    image = h.view.grabWindow()
+    blue, grey = h.eval("String(ptuGauge.colour)"), "#1e1e1e"
+    for across in (-8, 0, 8):
+        before, after = colour_at(value_angle, -3, across), colour_at(value_angle, 3, across)
+        h.check(before == blue and after == grey,
+                "cut flat at the value, %+d px across the ring: %s just before, %s just after"
+                % (across, before, after))
+    cap = colour_at(start_angle, -6, 0)
+    h.check(cap == blue, "the bar's start keeps its rounded end over the track's (got %s)" % cap)
+    h.shot("value_cutoff")
+
+    with h.mock.lock:
+        h.mock.pids["ptu"] = 0
+    h.wait_until("ptuGauge.currentValue === 0", 2000)
+    h.wait(200)
+    image = h.view.grabWindow()
+    cap = colour_at(start_angle, -6, 0)
+    h.check(cap == grey, "at the bottom of the scale there's no bar, not even its rounded start (got %s)" % cap)
+
+
+@scenario
 def gauge_tap_does_nothing(h):
     """Tapping the lambda / split gauge no longer changes the OBD mode."""
     h.start_app()
@@ -487,6 +540,9 @@ def drive_mode_fan(h):
     """The drive mode button fans the modes out to the right; picking sends driveMode, tapping outside changes nothing."""
     h.start_app(settings={"driveMode": 2})
     h.check(h.eval("driveModeGauge.name") == "Track", "the drive mode button shows the ESP32's mode (Track)")
+    h.check(h.eval("[driveModeGauge.topText, driveModeGauge.name, driveModeGauge.statusText]") == ["Drive", "Track", "Mode"]
+            and h.eval("driveModeGauge.nameSize > 10 && driveModeGauge.topOffset === -driveModeGauge.statusOffset"),
+            "reads Drive / Track / Mode, the mode larger, with Drive and Mode evenly above and below it")
     h.check(not h.eval("driveModeFan.visible"), "fan starts closed")
 
     h.click("driveModeGauge")

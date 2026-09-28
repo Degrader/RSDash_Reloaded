@@ -327,15 +327,25 @@ Rectangle {
         rightValue: total >= minTotal ? 100 * rightRDUTqGauge.currentValue / total : 0
     }
 
-    // Centred between the four big gauges, pulsing. The image has
-    // transparent space above and below the artwork, so at 50 px tall the
-    // visible part still clears all four rings (and their indicator dots)
-    // at the top of its pulse.
+    // In the free space between the four big gauges, pulsing. The top
+    // gauges' rings are open at the bottom, so that space is centred higher
+    // than the gauges themselves: midway between the lower ends of the top
+    // rings and the tops of the bottom rings. The image has transparent
+    // space above and below the artwork, so at 80 px tall the visible part
+    // clears all four rings by about 14 px at the top of its pulse.
     Image {
         id: nutronLogo
-        height: 50
+        height: 80
+
+        // Lowest point of the top rings (their ends) and highest point of
+        // the bottom rings, including the rings' thickness
+        readonly property real topRingsBottom: ptuGauge.y + ptuGauge.height / 2
+            + (ptuGauge.width / 2 - ptuGauge.thick) * Math.sin(ptuGauge.startAngleDegrees * Math.PI / 180)
+            + ptuGauge.thick / 2
+        readonly property real bottomRingsTop: rduGauge.y + rduGauge.thick / 2
+
         x: (ptuGauge.x + oilGauge.x + oilGauge.width) / 2 - width / 2
-        y: (ptuGauge.y + rduGauge.y + rduGauge.height) / 2 - height / 2
+        y: (topRingsBottom + bottomRingsTop) / 2 - height / 2
         fillMode: Image.PreserveAspectFit
         source: "res/nutron.png"
         smooth: true
@@ -445,9 +455,13 @@ Rectangle {
             size: 80
             thick: 9
 
+            // Drive / <mode> / Mode, with the mode larger
+            topText: "Drive"
+            topOffset: -16
             name: driveModeFan.nameFor(driveModeState.currentValue)
-            nameSize: 15
+            nameSize: 14
             statusText: "Mode"
+            statusOffset: 16
             showStatus: 1
             currentValue: 1
 

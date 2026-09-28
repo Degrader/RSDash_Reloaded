@@ -31,6 +31,11 @@ Rectangle {
     property int nameOffset: 0
     property int statusOffset: 15
 
+    // Optional small line above the name, in the same size as the status
+    // (e.g. "Drive" over the drive mode's name, with "Mode" under it)
+    property string topText: ""
+    property int topOffset: -15
+
     property real minValue
     property real maxValue
     property real startAngleDegrees
@@ -89,6 +94,18 @@ Rectangle {
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
             text: name
+            color: "#F8E63C"
+        }
+
+        Text {
+            id: gaugeTopText
+            anchors.centerIn: buttonGaugeCanvas
+            anchors.verticalCenterOffset: topOffset
+            font.pixelSize: 10
+            font.weight: Font.Bold
+            horizontalAlignment: Text.AlignHCenter
+            visible: topText !== ""
+            text: topText
             color: "#F8E63C"
         }
 

@@ -86,6 +86,15 @@ Starting from v2.9.0, OBD Not Alone mode shows the RDU torque split, and Drift S
   - Each pick sends only what changes. Turning it on sends `enableDriftMode` first, and the All Modes / Drift Only choice (`driftInAllModes`) only once the ESP32 accepts, the same order the old buttons used. The settings page toggle is gone.
   - The drive mode fan is now the general `RadialFan` component, used by both buttons.
 
+Starting from v2.10.0, the gauges show their value with a flat cut instead of an indicator, and the logo is bigger:
+
+- **All gauges** (`SyncMyMod/app/Components/Controller.js`, `PlasmaGauge.qml`, `SemiCircularGauge.qml`, `SplitPlasmaGauge.qml`)
+  - The round indicator circle on each gauge is gone. The coloured bar now ends in a flat cut straight across the ring, exactly at the value, so you can see precisely where a reading sits, including against the blue and red threshold marks. The start of the bar keeps its rounded end to match the grey track, and a reading at the very bottom of the scale shows no bar at all. All three gauge types draw the bar with the same `drawValueArc()` in `Controller.js`.
+- **Logo** (`SyncMyMod/app/PrimaryView.qml`)
+  - The logo between the big gauges is 80 px tall (was 50) and sits 17 px higher. The top gauges' rings are open at the bottom, so the free space between the four gauges is centred higher than the gauges themselves; the logo is now centred in that space, midway between the lower ends of the top rings and the tops of the bottom rings. It clears every ring and mark by about 14 px at the top of its pulse.
+- **Drive mode button** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/ButtonGauge.qml`)
+  - The button reads **Drive** above the mode and **Mode** below it, with the mode larger, so it's balanced top to bottom. `ButtonGauge` has a new optional `topText` line for this. While a fan is open, its stand-in for the button has a solid centre, so the dimmed button's text no longer shows through behind "Close".
+
 ## Testing on a PC
 
 `dev/` has a harness that runs the app against a fake ESP32, clicks through it, checks for QML errors and Sync 3 compatibility problems, and takes screenshots. See [dev/README.md](dev/README.md).
@@ -193,4 +202,13 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - `DriveModeFan` is now `RadialFan`, a general fan with its options and direction set by the page
 - Added a video tour (`docs/tour.gif`, `docs/tour.mp4`), recorded by `dev/tour.py`
 - Harness: Not Alone checks cover the torque split; added scenarios for all torque on one side and low torque, and for the Drift Stick fan (including a rejected change); shared fan layout checks; removed the settings page Drift Stick scenario
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.10.0JC] - 2026-09-27
+- Gauges: removed the round indicator circle; the coloured bar ends in a flat cut straight across the ring, exactly at the value (the start stays rounded, and no bar is drawn at the bottom of the scale)
+- The value bar on all three gauge types is drawn by one shared `drawValueArc()` in `Controller.js`
+- Main view: the logo is 80 px tall (was 50), centred in the free space between the big gauges' rings, which is 17 px higher than before
+- Main view: the drive mode button reads Drive / <mode> / Mode, with the mode larger (new `topText` line on `ButtonGauge`)
+- Fans: the stand-in for the button while a fan is open has a solid centre, so the button's own text no longer shows through behind "Close"
+- Harness: added a pixel check that the bar is cut flat across the ring at the value, keeps its rounded start, and draws nothing at the bottom of the scale; the logo checks now measure against each ring as drawn (its arc, thickness and marks) and require 8 px of room at full pulse; video tour and screenshots re-rendered
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

@@ -68,7 +68,6 @@ Rectangle {
                 var centerX = width / 2;
                 var centerY = height / 2;
                 var radius = Math.min(centerX, centerY);
-                var indicatorRadius = 14;
 
                 var startAngle = startAngleDegrees;
                 var endAngle = endAngleDegrees;
@@ -93,11 +92,7 @@ Rectangle {
                 ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, endAngle * Math.PI / 180, reverse);
                 ctx.stroke();
 
-
-                ctx.strokeStyle = colour;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius - thick, startAngle * Math.PI / 180, progressAngle * Math.PI / 180, reverse);
-                ctx.stroke();
+                Controller.drawValueArc(ctx, centerX, centerY, radius - thick, thick, startAngle, progressAngle, reverse, colour);
 
                 if (showThresholdMarks) {
                     Controller.drawThresholdMarks(ctx, centerX, centerY, radius - thick, thick, function(value) {
@@ -105,14 +100,6 @@ Rectangle {
                         return startAngle + (reverse ? -n : n) * delta;
                     });
                 }
-
-                ctx.fillStyle = "#2A2A2A";
-                ctx.strokeStyle = colour;
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.arc(centerX + (radius - thick) * Math.cos(progressAngle * Math.PI / 180), centerY + (radius - thick) * Math.sin(progressAngle * Math.PI / 180), indicatorRadius, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.stroke();
             }
         }
 

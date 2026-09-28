@@ -244,6 +244,28 @@ function drawThresholdMarks(ctx, centerX, centerY, ringRadius, thick, angleFor) 
     }
 }
 
+// Draws the coloured bar showing a gauge's value along its ring, from
+// startDegrees to valueDegrees (canvas angles; anticlockwise as for arc()).
+// The value end is cut flat, straight across the ring, so it shows exactly
+// where the value sits. The start keeps a rounded end to match the grey
+// track underneath. A value at the very start of the scale draws nothing.
+function drawValueArc(ctx, centerX, centerY, ringRadius, thick, startDegrees, valueDegrees, anticlockwise, colour) {
+    if (valueDegrees === startDegrees) return;
+    var start = startDegrees * Math.PI / 180;
+
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = thick;
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, ringRadius, start, valueDegrees * Math.PI / 180, anticlockwise);
+    ctx.stroke();
+
+    ctx.fillStyle = colour;
+    ctx.beginPath();
+    ctx.arc(centerX + ringRadius * Math.cos(start), centerY + ringRadius * Math.sin(start), thick / 2, 0, 2 * Math.PI);
+    ctx.fill();
+}
+
 function getVersion() {
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {

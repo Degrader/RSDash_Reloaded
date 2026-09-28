@@ -100,6 +100,9 @@ Item {
         name: fanRoot.hub ? fanRoot.hub.name : ""
         nameSize: fanRoot.hub ? fanRoot.hub.nameSize : 0
         nameOffset: fanRoot.hub ? fanRoot.hub.nameOffset : 0
+        topText: fanRoot.hub ? fanRoot.hub.topText : ""
+        topOffset: fanRoot.hub ? fanRoot.hub.topOffset : 0
+        statusOffset: fanRoot.hub ? fanRoot.hub.statusOffset : 15
         statusText: "Close"
         showStatus: 1
         primaryColor: "#329BFD"
@@ -109,6 +112,17 @@ Item {
         maxValue: 1
         startAngleDegrees: 0
         endAngleDegrees: 360
+
+        // Solid centre so the real button's text underneath doesn't show
+        // through behind "Close"
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width - 2 * parent.thick
+            height: width
+            radius: width / 2
+            color: "black"
+            z: -1
+        }
     }
 
     Repeater {
