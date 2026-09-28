@@ -50,7 +50,7 @@ function loadSettings() {
     xhr.send();
 }
 
-function fetchData(endpoint, data, dummy) {
+function fetchData(endpoint, data) {
     if (!canStartRequest(requestsInFlight[endpoint])) {
         // Previous poll for this endpoint hasn't finished yet - skip this
         // tick instead of stacking another request behind it.
@@ -84,7 +84,6 @@ function fetchData(endpoint, data, dummy) {
             for (var i = 0; i < data.length; ++i) {
                 var gaugeItem = data[i];
                 gaugeItem.gaugeId.currentValue = jsonData[gaugeItem.param];
-                if (dummy) checkDummyGauges();
             }
         }
     }
@@ -133,7 +132,7 @@ function checkNotAlone(force) {
 }
 
 // onDone (optional): called with true/false for whether the POST succeeded.
-function sendData(endpoint, gauge, value, control, dummy, onDone) {
+function sendData(endpoint, gauge, value, control, onDone) {
     var xhr = new XMLHttpRequest();
     xhr.open("POST", mainUrl + endpoint, true);
     xhr.setRequestHeader("Content-Type", "application/json");
@@ -147,7 +146,6 @@ function sendData(endpoint, gauge, value, control, dummy, onDone) {
             if (xhr.status === 200) {
                 if (control){
                     control.currentValue = value;
-                    if (dummy) checkDummyGauges();
                 }
             } else {
             }
@@ -243,26 +241,6 @@ function drawThresholdMarks(ctx, centerX, centerY, ringRadius, thick, angleFor) 
             ctx.lineTo(centerX + outer * Math.cos(angle), centerY + outer * Math.sin(angle));
             ctx.stroke();
         }
-    }
-}
-
-// Lights the drive mode button matching the startup drive mode. (The Drift
-// In toggle reads dummyDriftInGauge itself, so it isn't handled here.)
-function checkDummyGauges() {
-    var sdm = dummySDMGauge.currentValue;
-    var sdmGauges = [
-        normalModeGauge,
-        sportModeGauge,
-        trackModeGauge,
-        driftModeGauge,
-        'dummy',
-        lastModeGauge
-    ];
-
-    sdmGauges.forEach(function(gauge) { gauge.currentValue = 0; });
-
-    if (sdm >= 0 && sdm < sdmGauges.length) {
-        sdmGauges[sdm].currentValue = 1;
     }
 }
 

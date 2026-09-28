@@ -37,7 +37,11 @@ Rectangle {
     ]
 
     property var settingsData: [
-        { gaugeId: lcGauge,             param: "enableLC" }
+        { gaugeId: lcGauge,             param: "enableLC" },
+        { gaugeId: driftStickGauge,     param: "enableDriftMode" },
+        { gaugeId: espGauge,            param: "esp" },
+        { gaugeId: autoStartStopGauge,  param: "disableStartStop" },
+        { gaugeId: driveModeState,      param: "driveMode" }
     ]
 
     Image {
@@ -127,58 +131,31 @@ Rectangle {
     }
 
     Image {
-        id: nutronLogo
-        // Heads the right column; LC has the spot between the big gauges.
-        height: 50
-        anchors.top: parent.top
-        anchors.topMargin: 40
-        anchors.horizontalCenter: sensorArea.horizontalCenter
+        id: settingsButton
+        // Beside the close button; the right column runs to the top edge
+        anchors.top: closeButton.top
+        anchors.left: closeButton.right
+        anchors.leftMargin: 10
+        width: 34
         fillMode: Image.PreserveAspectFit
-        source: "res/nutron.png"
-        smooth: true
+        source: "res/settings.png"
         mipmap: true
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: 3000
-                easing.type: Easing.InOutQuad
-            }
-        }
-
-        Timer {
-            id: pulseTimer
-            interval: 3000
-            repeat: true
-            running: true
-            triggeredOnStart: true
-            onTriggered: {
-                if (scaleUp) {
-                    nutronLogo.scale = 1.1
-                } else {
-                    nutronLogo.scale = 1.0
-                }
-                scaleUp = !scaleUp
-            }
-            property bool scaleUp: true
-        }
 
         MouseArea {
             anchors.fill: parent
-            onClicked: {
-                loader.source = "SecondaryView.qml"
-                currentView = 2
-            }
+            onClicked: loader.source = "SettingsView.qml"
         }
     }
 
     PlasmaGauge {
         id: ptuGauge
-        anchors.margins: 30
         anchors.top: parent.top
-        anchors.left: parent.left
+        anchors.topMargin: 20
+        anchors.left: buttonColumn.right
+        anchors.leftMargin: 6
         height: size
         width: size
-        size: 220
+        size: 210
         thick: 24
 
         unitSymbol: "°"
@@ -206,10 +183,11 @@ Rectangle {
     PlasmaGauge {
         id: rduGauge
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
         anchors.left: ptuGauge.left
         width: size
         height: size
-        size: 220
+        size: 210
         thick: 24
 
         unitSymbol: "°"
@@ -236,12 +214,12 @@ Rectangle {
 
     PlasmaGauge {
         id: oilGauge
-        anchors.margins: 30
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: ptuGauge.top
+        anchors.left: ptuGauge.right
+        anchors.leftMargin: 8
         height: size
         width: size
-        size: 220
+        size: 210
         thick: 24
 
         unitSymbol: "°"
@@ -268,11 +246,11 @@ Rectangle {
 
     PlasmaGauge {
         id: lambdaGauge
-        anchors.bottom: parent.bottom
+        anchors.bottom: rduGauge.bottom
         anchors.left: oilGauge.left
         height: size
         width: size
-        size: 220
+        size: 210
         thick: 24
 
         unitSymbol: "^"
@@ -339,45 +317,183 @@ Rectangle {
         rightValue: rightRDUTempGauge.currentValue
     }
 
-    // In the gap between the four big gauges, sized to clear their rings
-    ButtonGauge {
-        id: lcGauge
-        anchors.centerIn: parent
-        anchors.horizontalCenterOffset: -135
-        anchors.verticalCenterOffset: 8
-        width: size
-        height: size
-        size: 90
-        thick: 11
+    // Controls down the left edge, under the close button. Each ring is lit
+    // while its setting is on.
+    Column {
+        id: buttonColumn
+        anchors.top: closeButton.bottom
+        anchors.topMargin: 4
+        anchors.left: parent.left
+        anchors.leftMargin: 6
+        spacing: 8
 
-        name: "LC"
-        nameSize: 21
+        ButtonGauge {
+            id: lcGauge
+            width: size
+            height: size
+            size: 80
+            thick: 9
 
-        primaryColor: "#3bb539"
+            name: "LC"
+            nameSize: 21
 
-        minValue: 0
-        maxValue: 1
-        showStatus: 1
+            primaryColor: "#0c32ff"
 
-        startAngleDegrees: 0
-        endAngleDegrees: 360
+            minValue: 0
+            maxValue: 1
 
-        MouseArea {
-            id: lcButton
-            anchors.fill: parent
-            onClicked: {
-                var newValue = lcGauge.currentValue ? 0 : 1
-                console.log("Current value: " + lcGauge.currentValue + " New Value: " +newValue)
-                Controller.sendData("settings", "enableLC", newValue, lcGauge, false)
+            startAngleDegrees: 0
+            endAngleDegrees: 360
+
+            MouseArea {
+                id: lcButton
+                anchors.fill: parent
+                onClicked: {
+                    var newValue = lcGauge.currentValue ? 0 : 1
+                    Controller.sendData("settings", "enableLC", newValue, lcGauge)
+                }
+            }
+        }
+
+        ButtonGauge {
+            id: espGauge
+            width: size
+            height: size
+            size: 80
+            thick: 9
+
+            name: "ESP"
+            nameSize: 17
+            nameOffset: -3
+            statusText: "Sport"
+            statusOffset: 13
+            showStatus: 1
+
+            primaryColor: "#0c32ff"
+
+            minValue: 0
+            maxValue: 1
+
+            startAngleDegrees: 0
+            endAngleDegrees: 360
+
+            MouseArea {
+                id: espButton
+                anchors.fill: parent
+                onClicked: {
+                    var newValue = espGauge.currentValue ? 0 : 1
+                    Controller.sendData("settings", "esp", newValue, espGauge)
+                }
+            }
+        }
+
+        // Shows the drive mode; tapping it fans the modes out to the right.
+        // In the middle of the column so the fan has the full height.
+        ButtonGauge {
+            id: driveModeGauge
+            width: size
+            height: size
+            size: 80
+            thick: 9
+
+            name: driveModeFan.nameFor(driveModeState.currentValue)
+            nameSize: 15
+            statusText: "Mode"
+            showStatus: 1
+            currentValue: 1
+
+            primaryColor: "#0c32ff"
+
+            minValue: 0
+            maxValue: 1
+
+            startAngleDegrees: 0
+            endAngleDegrees: 360
+
+            MouseArea {
+                id: driveModeButton
+                anchors.fill: parent
+                onClicked: driveModeFan.open = true
+            }
+        }
+
+        ButtonGauge {
+            id: autoStartStopGauge
+            width: size
+            height: size
+            size: 80
+            thick: 9
+
+            statusText: "OFF"
+            statusOffset: 20
+            showStatus: 1
+
+            primaryColor: "#0c32ff"
+
+            minValue: 0
+            maxValue: 1
+
+            startAngleDegrees: 0
+            endAngleDegrees: 360
+
+            StartStopIcon {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: -4
+                width: 34
+                height: 34
+            }
+
+            MouseArea {
+                id: autoStartStopButton
+                anchors.fill: parent
+                onClicked: {
+                    var newValue = autoStartStopGauge.currentValue ? 0 : 1
+                    Controller.sendData("settings", "disableStartStop", newValue, autoStartStopGauge)
+                }
+            }
+        }
+
+        // Which modes it works in (All Modes / Drift Mode Only) is on the
+        // settings page
+        ButtonGauge {
+            id: driftStickGauge
+            width: size
+            height: size
+            size: 80
+            thick: 9
+
+            name: "Drift\nStick"
+            nameSize: 14
+
+            primaryColor: "#0c32ff"
+
+            minValue: 0
+            maxValue: 1
+
+            startAngleDegrees: 0
+            endAngleDegrees: 360
+
+            MouseArea {
+                id: driftStickButton
+                anchors.fill: parent
+                onClicked: {
+                    var newValue = driftStickGauge.currentValue ? 0 : 1
+                    Controller.sendData("settings", "enableDriftMode", newValue, driftStickGauge)
+                }
             }
         }
     }
 
-    // Tire pressures and RDU torque under the logo, all shown at once (this
-    // used to switch between TPMS and RDU with the Extra View setting).
+    // The ESP32's driveMode, shown by driveModeGauge and the fan
+    Item {
+        id: driveModeState
+        property real currentValue: 0
+    }
+    // Right column, four rows: front and rear tire pressures, RDU clutch
+    // temps and RDU torque, all shown at once.
     Item {
         id: sensorArea
-        anchors.top: nutronLogo.bottom
+        anchors.top: parent.top
         anchors.left: oilGauge.right
         anchors.leftMargin: 10
         anchors.bottom: parent.bottom
@@ -387,7 +503,7 @@ Rectangle {
             id: frontLeftTireGauge
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: 14
+            anchors.topMargin: 8
 
             width: size
             height: size
@@ -462,7 +578,7 @@ Rectangle {
             id: tpmsText
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: frontLeftTireGauge.bottom
-            anchors.verticalCenterOffset: 9
+            anchors.verticalCenterOffset: 4
 
             font.weight: Font.Bold
             font.pixelSize: 23
@@ -475,7 +591,7 @@ Rectangle {
             id: rearLeftTireGauge
             anchors.left: frontLeftTireGauge.left
             anchors.top: frontLeftTireGauge.bottom
-            anchors.topMargin: 18
+            anchors.topMargin: 8
 
             width: size
             height: size
@@ -544,13 +660,103 @@ Rectangle {
             reverse: true
         }
 
-        // Bottom row: RDU torque, or the RDU clutch temps - tap to switch
+        // RDU clutch temps: 0-120 C scale, red line at 105 C. These also
+        // feed the split gauge that replaces lambda in OBD Not Alone mode.
         SemiCircularGauge {
-            id: leftRDUTqGauge
+            id: leftRDUTempGauge
             anchors.left: rearLeftTireGauge.left
             anchors.top: rearLeftTireGauge.bottom
-            anchors.topMargin: 18
-            visible: !showRDUTemps
+            anchors.topMargin: 8
+
+            width: size
+            height: size
+            size: 110
+            thick: 12
+
+            unitSymbol: "°"
+
+            primaryColor: "#0c32ff"
+            secondaryColor: "#ce1845"
+
+            valueSize: 21
+            valueOffset: -4
+            minValue: 0
+            maxValue: 120
+
+            decimal: 0
+            measureType: "temperature"
+
+            lowTreshold: 0
+            highTreshold: 105
+
+            startAngleDegrees: 70
+            endAngleDegrees: 290
+        }
+
+        Text {
+            id: rduTempText
+            anchors.centerIn: leftRDUTempGauge
+            anchors.horizontalCenterOffset: 70
+            font.weight: Font.Bold
+            font.pixelSize: 23
+            horizontalAlignment: Text.AlignHCenter
+            color: "#F8E63C"
+            text: "Temps"
+        }
+
+        SemiCircularGauge {
+            id: rightRDUTempGauge
+            anchors.top: leftRDUTempGauge.top
+            anchors.left: leftRDUTempGauge.right
+            anchors.leftMargin: 30
+
+            width: size
+            height: size
+            size: 110
+            thick: 12
+
+            unitSymbol: "°"
+
+            primaryColor: "#0c32ff"
+            secondaryColor: "#ce1845"
+
+            valueSize: 21
+            valueOffset: 4
+            minValue: 0
+            maxValue: 120
+
+            decimal: 0
+            measureType: "temperature"
+
+            lowTreshold: 0
+            highTreshold: 105
+
+            startAngleDegrees: 110
+            endAngleDegrees: 250
+
+            reverse: true
+        }
+
+        // Between the temps and torque rows
+        Text {
+            id: rduText
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: leftRDUTempGauge.bottom
+            anchors.verticalCenterOffset: 4
+
+            font.weight: Font.Bold
+            font.pixelSize: 23
+            horizontalAlignment: Text.AlignHCenter
+            color: "#F8E63C"
+            text: "RDU"
+        }
+
+        // RDU torque
+        SemiCircularGauge {
+            id: leftRDUTqGauge
+            anchors.left: leftRDUTempGauge.left
+            anchors.top: leftRDUTempGauge.bottom
+            anchors.topMargin: 8
 
             width: size
             height: size
@@ -560,7 +766,8 @@ Rectangle {
             primaryColor: "#0c32ff"
             secondaryColor: "#ce1845"
 
-            valueSize: 23
+            valueSize: 21
+            valueOffset: -4
             minValue: 0
             maxValue: 1600
 
@@ -575,14 +782,14 @@ Rectangle {
         }
 
         Text {
-            id: rduRowText
+            id: rduTorqueText
             anchors.centerIn: leftRDUTqGauge
             anchors.horizontalCenterOffset: 70
             font.weight: Font.Bold
-            font.pixelSize: 18
+            font.pixelSize: 23
             horizontalAlignment: Text.AlignHCenter
             color: "#F8E63C"
-            text: showRDUTemps ? "RDU\nTemps" : "RDU\nTorque"
+            text: "Torque"
         }
 
         SemiCircularGauge {
@@ -590,7 +797,6 @@ Rectangle {
             anchors.top: leftRDUTqGauge.top
             anchors.left: leftRDUTqGauge.right
             anchors.leftMargin: 30
-            visible: !showRDUTemps
 
             width: size
             height: size
@@ -600,7 +806,8 @@ Rectangle {
             primaryColor: "#0c32ff"
             secondaryColor: "#ce1845"
 
-            valueSize: 23
+            valueSize: 21
+            valueOffset: 4
             minValue: 0
             maxValue: 1600
 
@@ -615,80 +822,6 @@ Rectangle {
 
             reverse: true
         }
-
-        // RDU clutch temps: 0-120 C scale, red line at 105 C. These also
-        // feed the split gauge that replaces lambda in OBD Not Alone
-        // mode, so they get updated even while hidden.
-        SemiCircularGauge {
-            id: leftRDUTempGauge
-            anchors.left: leftRDUTqGauge.left
-            anchors.top: leftRDUTqGauge.top
-            visible: showRDUTemps
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 105
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        SemiCircularGauge {
-            id: rightRDUTempGauge
-            anchors.left: rightRDUTqGauge.left
-            anchors.top: rightRDUTqGauge.top
-            visible: showRDUTemps
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 105
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
-        }
-
-        MouseArea {
-            id: rduRowToggle
-            anchors.left: leftRDUTqGauge.left
-            anchors.right: rightRDUTqGauge.right
-            anchors.top: leftRDUTqGauge.top
-            anchors.bottom: leftRDUTqGauge.bottom
-            onClicked: showRDUTemps = !showRDUTemps
-        }
     }
 
     // Polls live PID values (temps, pressures, etc.) at the configured
@@ -700,7 +833,7 @@ Rectangle {
         running: true
         repeat: true
         onTriggered: {
-            Controller.fetchData("pids", pidsData, false);
+            Controller.fetchData("pids", pidsData);
         }
     }
 
@@ -719,10 +852,21 @@ Rectangle {
         }
     }
 
+    // Last and above the Ready To Race popup, so it covers the whole page
+    // while open
+    DriveModeFan {
+        id: driveModeFan
+        anchors.fill: parent
+        z: 1000
+        hub: driveModeGauge
+        currentMode: driveModeState.currentValue
+        onPicked: Controller.sendData("settings", "driveMode", value, driveModeState)
+    }
+
     Component.onCompleted: {
         console.log("Primary View Loaded. Fetching data due to Page Load...")
-        Controller.fetchData("pids", pidsData, false);
-        Controller.fetchData("settings", settingsData, false);
+        Controller.fetchData("pids", pidsData);
+        Controller.fetchData("settings", settingsData);
         Controller.checkNotAlone();
     }
 }

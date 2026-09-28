@@ -249,19 +249,12 @@ class Harness:
         self.wait(400)  # its first fetches
 
     def goto_settings(self):
-        if self.current_page() == "PrimaryView.qml":
-            self.click("nutronLogo")
-            self.goto_page("SecondaryView.qml")
         self.click("settingsButton")
         self.goto_page("SettingsView.qml")
 
     def goto_gauges(self):
-        if self.current_page() == "SettingsView.qml":
-            self.click("backButton")
-            self.goto_page("SecondaryView.qml")
-        if self.current_page() == "SecondaryView.qml":
-            self.click("nutronLogo2")
-            self.goto_page("PrimaryView.qml")
+        self.click("backButton")
+        self.goto_page("PrimaryView.qml")
 
     # -- results
 
@@ -305,20 +298,28 @@ def gauges_alone(h):
                    " && leftRDUTqGauge.visible && rightRDUTqGauge.visible"),
             "tire pressures and RDU torque both shown")
     h.check(h.eval("[leftRDUTqGauge.currentValue, rightRDUTqGauge.currentValue]") == [120, 135], "RDU torque received")
-    h.check(h.eval(
-        "(function() {"
-        "  var cx = lcGauge.x + lcGauge.width / 2, cy = lcGauge.y + lcGauge.height / 2;"
-        "  var lcRing = lcGauge.width / 2 - lcGauge.thick / 2;"
-        "  return [ptuGauge, oilGauge, rduGauge, lambdaGauge].every(function(g) {"
-        "    var dx = g.x + g.width / 2 - cx, dy = g.y + g.height / 2 - cy;"
-        "    return Math.sqrt(dx * dx + dy * dy) >= g.width / 2 - g.thick / 2 + lcRing;"
-        "  });"
-        "})()"), "LC sits between the four big gauges without touching their rings")
-    h.check(h.eval("nutronLogo.y + nutronLogo.height <= sensorArea.y"
-                   " && Math.abs(nutronLogo.x + nutronLogo.width / 2 - (sensorArea.x + sensorArea.width / 2)) < 1"
-                   " && nutronLogo.width * 1.1 <= sensorArea.width"),
-            "logo heads the right column and fits it at the top of its pulse")
-    h.check(h.eval("rightRDUTqGauge.mapToItem(null, 0, rightRDUTqGauge.height).y <= 480"), "torque row fits on screen")
+    h.check(h.eval("[lcGauge, espGauge, driveModeGauge, autoStartStopGauge, driftStickGauge].every(function(b, i, all) {"
+                   " var p = b.mapToItem(null, 0, 0); return b.visible && b.width >= 80"
+                   " && p.x + b.width <= ptuGauge.x && p.y >= closeButton.y + closeButton.height"
+                   " && p.y + b.height <= 480 && (i === 0 || b.y > all[i - 1].y); })"),
+            "LC, ESP, Mode, start/stop and Drift Stick stacked in that order down the left, under the close button,"
+            " clear of the gauges")
+    h.check(h.eval("Math.abs(driveModeGauge.mapToItem(null, 0, driveModeGauge.height / 2).y - 240) < 30"),
+            "drive mode button is at the middle of the screen's height")
+    h.check(h.eval("oilGauge.x >= ptuGauge.x + ptuGauge.width && sensorArea.x >= oilGauge.x + oilGauge.width"
+                   " && sensorArea.x + sensorArea.width <= 800"),
+            "big gauges and the right column fit side by side on 800 px")
+    h.check(h.eval("rduGauge.y >= ptuGauge.y + ptuGauge.height && rduGauge.y + rduGauge.height <= 480"),
+            "both rows of big gauges fit on 480 px")
+    h.check(h.eval("settingsButton.x >= closeButton.x + closeButton.width && settingsButton.y === closeButton.y"
+                   " && settingsButton.x + settingsButton.width <= ptuGauge.x"),
+            "settings button beside the close button, left of the gauges")
+    h.check(h.eval("(function() { var rows = [[frontLeftTireGauge, frontRightTireGauge], [rearLeftTireGauge, rearRightTireGauge],"
+                   " [leftRDUTempGauge, rightRDUTempGauge], [leftRDUTqGauge, rightRDUTqGauge]];"
+                   " return rows.every(function(r, i) { var l = r[0].mapToItem(null, 0, 0), g = r[1].mapToItem(null, 0, 0);"
+                   " return r[0].visible && r[1].visible && l.y === g.y && l.y >= 0 && l.y + r[0].height <= 480"
+                   " && (i === 0 || l.y >= rows[i - 1][0].mapToItem(null, 0, 0).y + rows[i - 1][0].height); }); })()"),
+            "front, rear, RDU temps and RDU torque rows all shown, top to bottom, on screen")
     h.check(h.eval("ptuGauge.showThresholdMarks && rduGauge.showThresholdMarks && oilGauge.showThresholdMarks"
                    " && frontLeftTireGauge.showThresholdMarks && rearRightTireGauge.showThresholdMarks"
                    " && !lambdaGauge.showThresholdMarks && !leftRDUTqGauge.showThresholdMarks"),
@@ -338,26 +339,28 @@ def gauges_not_alone(h):
 
 
 @scenario
-def rdu_row_toggle(h):
-    """Tapping the RDU Torque row switches it to the RDU clutch temps and back; the choice survives a page change."""
+def rdu_rows(h):
+    """RDU clutch temps and RDU torque are both shown, temps above torque; tapping them does nothing."""
     h.start_app(pids={"rdutl": 108, "rdutr": 98})  # left clutch over the 105 C red line, right under it
-    h.check(h.eval("leftRDUTqGauge.visible && !leftRDUTempGauge.visible && rduRowText.text === 'RDU\\nTorque'"),
-            "starts on RDU torque")
-    h.click("rduRowToggle")
-    h.check(h.eval("leftRDUTempGauge.visible && rightRDUTempGauge.visible && !leftRDUTqGauge.visible"),
-            "tap shows the clutch temps")
-    h.check(h.eval("rduRowText.text") == "RDU\nTemps", "label reads RDU / Temps")
     h.check(h.eval("[leftRDUTempGauge.currentValue, rightRDUTempGauge.currentValue]") == [108, 98], "clutch temps received")
+    h.check(h.eval("[leftRDUTqGauge.currentValue, rightRDUTqGauge.currentValue]") == [120, 135], "RDU torque received")
+    h.check(h.eval("[rduTempText.text, rduText.text, rduTorqueText.text]") == ["Temps", "RDU", "Torque"],
+            "labelled like TPMS: Temps, RDU between the rows, Torque")
+    h.check(h.eval("rduText.font.pixelSize === tpmsText.font.pixelSize && rduTempText.font.pixelSize === frontText.font.pixelSize"
+                   " && rduTorqueText.font.pixelSize === frontText.font.pixelSize"
+                   " && Math.abs((rduText.y + rduText.height / 2)"
+                   " - (leftRDUTempGauge.y + leftRDUTempGauge.height + leftRDUTqGauge.y) / 2) < 1"
+                   " && Math.abs(rduText.x + rduText.width / 2 - sensorArea.width / 2) < 1"),
+            "same sizes as the TPMS labels, with RDU centred between the four RDU gauges")
     h.check(h.eval("leftRDUTempGauge.highTreshold === 105 && rightRDUTempGauge.highTreshold === 105"
                    " && clutchTempGauge.highTreshold === 105"),
             "clutch temp red line is 105 C on every clutch gauge")
-    h.check(not h.mock.posts, "switching sent nothing to the ESP32")
-    h.shot("rdu_temps")
-    h.goto_settings()
-    h.goto_gauges()
-    h.check(h.eval("leftRDUTempGauge.visible"), "still on clutch temps after visiting the other pages")
-    h.click("rduRowToggle")
-    h.check(h.eval("leftRDUTqGauge.visible && !leftRDUTempGauge.visible"), "tapping again goes back to torque")
+    h.shot("rdu_rows")
+    h.click("leftRDUTempGauge")
+    h.click("leftRDUTqGauge")
+    h.wait(300)
+    h.check(not h.mock.posts and h.eval("leftRDUTempGauge.visible && leftRDUTqGauge.visible"),
+            "tapping the rows sends nothing and hides nothing")
 
 
 @scenario
@@ -388,43 +391,93 @@ def gauge_tap_does_nothing(h):
 
 
 @scenario
-def drive_modes_page(h):
-    """Drive mode page: Drift Stick Enabled + Drift In toggle on the left, ESP + auto start/stop under OTHERS."""
-    h.start_app(settings={"enableDriftMode": 1, "esp": 1, "disableStartStop": 1, "driftInAllModes": 1, "driveMode": 2})
-    h.click("nutronLogo")
-    h.goto_page("SecondaryView.qml")
-    h.check(h.eval("[driftStickGauge.currentValue, espGauge.currentValue, autoStartStopGauge.currentValue]") == [1, 1, 1],
-            "Drift Stick, ESP and auto start/stop show the ESP32's settings")
-    h.check(h.eval("driftInGauge.name + ' ' + driftInGauge.statusText") == "All Modes", "Drift In toggle shows All Modes")
-    h.check(h.eval("driftStickText.y === othersText.y"), "DRIFT STICK and OTHERS headings line up")
-    h.check(h.eval("driftStickGauge.x + driftStickGauge.width === driftInGauge.x"
-                   " && driftStickGauge.width === 120 && driftInGauge.width === 120"),
-            "full-size Drift Stick Enabled button, with the Drift In toggle right of it")
-    h.check(h.eval("driftInGauge.x + driftInGauge.width"
-                   " <= nutronLogo2.x + nutronLogo2.width / 2 - nutronLogo2.width * 1.1 / 2"),
-            "left side clears the logo at the top of its pulse")
-    h.shot("drive_modes")
-
-    h.click("driftInGauge")
-    h.wait(300)
-    h.check(h.mock.posts[-1:] == [{"driftInAllModes": 0}], "tapping the toggle sent driftInAllModes=0")
-    h.check(h.eval("driftInGauge.name + ' ' + driftInGauge.statusText") == "Drift Mode Only", "toggle now shows Drift Mode Only")
-
-    h.click("driftStickGauge")
-    h.wait(300)
-    h.check(h.mock.posts[-1:] == [{"enableDriftMode": 0}], "tapping Drift Stick Enabled turned it off")
-    h.check(h.eval("driftInGauge.opacity") < 1, "Drift In toggle dimmed while Drift Stick is off")
-    posts_before = len(h.mock.posts)
-    h.click("driftInGauge")
-    h.wait(300)
-    h.check(len(h.mock.posts) == posts_before and h.eval("driftInGauge.name") == "Drift",
-            "Drift In toggle can't be changed while Drift Stick is off")
-    h.shot("drive_modes_stick_off")
-
-    for item, key in (("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
+def main_page_buttons(h):
+    """LC, Drift Stick, ESP and auto start/stop in the left column show and change the ESP32's settings."""
+    h.start_app(settings={"enableLC": 1, "enableDriftMode": 1, "esp": 1, "disableStartStop": 1})
+    h.check(h.eval("[lcGauge.currentValue, driftStickGauge.currentValue, espGauge.currentValue,"
+                   " autoStartStopGauge.currentValue]") == [1, 1, 1, 1],
+            "all four buttons lit from the ESP32's settings")
+    h.shot("main_page_buttons")
+    for item, key in (("lcGauge", "enableLC"), ("driftStickGauge", "enableDriftMode"),
+                      ("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
         h.click(item)
         h.wait(300)
-        h.check(h.mock.posts[-1:] == [{key: 0}], "tapping %s turned %s off" % (item, key))
+        h.check(h.mock.posts[-1:] == [{key: 0}] and h.eval("%s.currentValue" % item) == 0,
+                "tapping %s turned %s off" % (item, key))
+        h.click(item)
+        h.wait(300)
+        h.check(h.mock.posts[-1:] == [{key: 1}] and h.eval("%s.currentValue" % item) == 1,
+                "and tapping again turned it back on")
+
+
+@scenario
+def drive_mode_fan(h):
+    """The drive mode button fans the modes out to the right; picking sends driveMode, tapping outside changes nothing."""
+    h.start_app(settings={"driveMode": 2})
+    h.check(h.eval("driveModeGauge.name") == "Track", "the drive mode button shows the ESP32's mode (Track)")
+    h.check(not h.eval("driveModeFan.visible"), "fan starts closed")
+
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.check(h.eval("driveModeFan.visible && driveModeFan.progress === 1"), "tapping the button opens the fan")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.modeButton(i).currentValue; })")
+            == [0, 0, 1, 0, 0], "only Track is lit in the fan")
+    h.check(h.eval("(function(){ for (var i = 0; i < 5; i++) { var b = driveModeFan.modeButton(i);"
+                   " var p = b.mapToItem(null, 0, 0);"
+                   " if (p.x < 0 || p.y < 0 || p.x + b.width > 800 || p.y + b.height > 480) return false; }"
+                   " return true; })()"), "all five mode buttons fit on the 800x480 screen")
+    h.check(h.eval("(function(){ var items = [driveModeFan.modeButton(0), driveModeFan.modeButton(1),"
+                   " driveModeFan.modeButton(2), driveModeFan.modeButton(3), driveModeFan.modeButton(4), driveModeGauge];"
+                   " function c(b) { return b.mapToItem(null, b.width / 2, b.height / 2); }"
+                   " for (var i = 0; i < items.length; i++) for (var j = i + 1; j < items.length; j++) {"
+                   " var a = c(items[i]), b = c(items[j]);"
+                   " if (Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) < (items[i].width + items[j].width) / 2)"
+                   " return false; } return true; })()"),
+            "mode buttons don't overlap each other or the drive mode button")
+    h.check(h.eval("[0, 1, 2, 3, 4].every(function(i) { var b = driveModeFan.modeButton(i);"
+                   " return b.mapToItem(null, 0, 0).x >= buttonColumn.x + buttonColumn.width; })"),
+            "mode buttons clear the button column")
+    h.check(h.eval("(function(){ var ys = [0, 1, 2, 3, 4].map(function(i) { return driveModeFan.modeButton(i).y; });"
+                   " var track = driveModeFan.modeButton(2);"
+                   " return ys[0] < ys[1] && ys[1] < ys[2] && ys[2] < ys[3] && ys[3] < ys[4]"
+                   " && Math.abs(track.mapToItem(null, 0, track.height / 2).y"
+                   " - driveModeGauge.mapToItem(null, 0, driveModeGauge.height / 2).y) < 1; })()"),
+            "Normal to Custom top to bottom, with Track level with the drive mode button")
+    h.shot("drive_mode_fan")
+
+    posts_before = len(h.mock.posts)
+    h.click("driveModeFan.modeButton(1)")
+    h.wait(300)
+    h.check(h.mock.posts[posts_before:] == [{"driveMode": 1}], "tapping Sport sent driveMode=1 and nothing else")
+    h.check(h.wait_until("!driveModeFan.visible", 1000), "fan closes after a pick")
+    h.check(h.eval("driveModeGauge.name") == "Sport", "the button now shows Sport")
+
+    # Custom is driveMode 5 (4 isn't used)
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.click("driveModeFan.modeButton(4)")
+    h.wait(300)
+    h.check(h.mock.posts[-1:] == [{"driveMode": 5}], "tapping Custom sent driveMode=5")
+
+    posts_before = len(h.mock.posts)
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.click("settingsButton")  # under the fan, so this lands on its background
+    h.wait(300)
+    h.check(h.wait_until("!driveModeFan.visible", 1000), "tapping outside the buttons closes the fan")
+    h.check(len(h.mock.posts) == posts_before and h.current_page() == "PrimaryView.qml",
+            "and neither changes the mode nor reaches the settings button underneath")
+
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.click("driveModeGauge")  # lands on the fan's copy of it, on top
+    h.wait(300)
+    h.check(h.wait_until("!driveModeFan.visible", 1000) and len(h.mock.posts) == posts_before,
+            "tapping the drive mode button again closes the fan without a change")
+
+    h.eval("driveModeFan.closeAfterMs = 500")
+    h.click("driveModeGauge")
+    h.check(h.wait_until("!driveModeFan.visible", 1500), "fan closes by itself if nothing is picked")
 
 
 @scenario
@@ -458,13 +511,35 @@ def settings_obd_toggle(h):
 def settings_obd_refresh(h):
     """Opening settings re-reads the OBD mode, e.g. after it was changed from the RSapp phone app."""
     h.start_app()
-    h.click("nutronLogo")
-    h.goto_page("SecondaryView.qml")
     with h.mock.lock:
-        h.mock.settings["cobbFriendly"] = 1  # changed elsewhere; the secondary page doesn't poll it
-    h.click("settingsButton")
-    h.goto_page("SettingsView.qml")
+        h.mock.settings["cobbFriendly"] = 1  # changed elsewhere, before the main page's next 5 s check
+    h.goto_settings()
     h.check(h.wait_until("obdToggle.currentState === 'Not Alone'", 1500), "toggle shows Not Alone as soon as settings opens")
+
+
+@scenario
+def settings_drift_in(h):
+    """The settings page's Drift Stick toggle picks All Modes / Drift Only, and is locked while Drift Stick is off."""
+    h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1})
+    h.goto_settings()
+    h.check(h.wait_until("driftInToggle.currentState === 'All Modes'", 1500), "toggle shows All Modes from the ESP32")
+    h.click("driftInToggle")
+    h.wait(300)
+    h.check(h.mock.posts[-1:] == [{"driftInAllModes": 0}], "tapping it sent driftInAllModes=0")
+    h.check(h.eval("driftInToggle.currentState") == "Drift Only", "toggle now shows Drift Only")
+    h.shot("settings_drift_in")
+
+    h.goto_gauges()
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.check(h.mock.posts[-1:] == [{"enableDriftMode": 0}], "turned Drift Stick off on the main page")
+    h.goto_settings()
+    h.check(h.wait_until("driftInToggle.opacity < 1", 1500), "toggle dimmed while Drift Stick is off")
+    posts_before = len(h.mock.posts)
+    h.click("driftInToggle")
+    h.wait(300)
+    h.check(len(h.mock.posts) == posts_before and h.eval("driftInToggle.currentState") == "Drift Only",
+            "and it can't be changed")
 
 
 @scenario
@@ -581,19 +656,17 @@ def render_readme_shots(h):
     """Renders the screenshots shown in README.md into docs/screenshots/."""
     h.start_app(pids={"rdutql": 240, "rdutqr": 310})
     h.shot("main_view", README_SHOTS)
-    h.click("rduRowToggle")
-    h.wait(300)
-    h.shot("main_view_rdu_temps", README_SHOTS)
 
     h.start_app(settings={"cobbFriendly": 1}, pids={"rdutql": 240, "rdutqr": 310})
     h.shot("main_view_not_alone", README_SHOTS)
 
     h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1, "esp": 1, "disableStartStop": 1, "driveMode": 2})
-    h.click("nutronLogo")
-    h.goto_page("SecondaryView.qml")
-    h.shot("drive_modes", README_SHOTS)
-    h.click("settingsButton")
-    h.goto_page("SettingsView.qml")
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.shot("drive_mode_fan", README_SHOTS)
+    h.click("driveModeFan.modeButton(2)")
+    h.wait(300)
+    h.goto_settings()
     h.shot("settings", README_SHOTS)
 
 

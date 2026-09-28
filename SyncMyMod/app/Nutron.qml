@@ -20,7 +20,6 @@ Rectangle {
     property string mainUrl: "http://192.168.80.1/";
     property string iniFilePath: "file:///fs/rwdata/fmods/NutronConfig.ini"
 
-    property int currentView: 1
     property int refresh: 250
     //property bool settingsLoaded: false
 
@@ -32,10 +31,6 @@ Rectangle {
     // so another OBD device (COBB AP, scan tool) can use it. Stored on the
     // ESP32 as cobbFriendly, not in the ini; set on the settings page.
     property bool notAlone: false
-
-    // Main view's bottom-right row: RDU clutch temps instead of RDU torque.
-    // Kept here so it survives switching pages; resets on app start.
-    property bool showRDUTemps: false
 
     property bool rtrDisplayed: false
 

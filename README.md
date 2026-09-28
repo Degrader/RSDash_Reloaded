@@ -10,11 +10,9 @@ All credit for the original design, the gauge layout, and the ESP32 firmware goe
 
 | Main view | Main view, OBD Not Alone |
 |:---:|:---:|
-| ![Main view: PTU, oil, RDU and lambda gauges, the LC button, tire pressures and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with both RDU clutch temps in place of lambda](docs/screenshots/main_view_not_alone.png) |
-| **RDU clutch temps** (tap the RDU Torque row) | **Drive modes** |
-| ![Main view with the bottom-right row showing RDU clutch temps](docs/screenshots/main_view_rdu_temps.png) | ![Drive mode page: startup drive mode, Drift Stick, ESP Sport and auto start/stop](docs/screenshots/drive_modes.png) |
-| **Settings** | |
-| ![Settings page: temperature, pressure and torque units, and the OBD mode](docs/screenshots/settings.png) | |
+| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left; PTU, oil, RDU and lambda gauges; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with both RDU clutch temps in place of lambda](docs/screenshots/main_view_not_alone.png) |
+| **Drive mode fan** (tap the mode button) | **Settings** |
+| ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Settings page: temperature, pressure and torque units, the OBD mode, and which modes Drift Stick works in](docs/screenshots/settings.png) |
 
 These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
@@ -56,6 +54,17 @@ Starting from v2.7.0, the main view and the drive mode page have been rearranged
 - **Drive mode page** (`SyncMyMod/app/SecondaryView.qml`, `SyncMyMod/app/Components/StartStopIcon.qml`)
   - The left group is now **DRIFT STICK**. The **Drift Stick Enabled** button (formerly Drift Fury) is on the far left. Next to it, the two DRIFT IN buttons are replaced by a single toggle between **All Modes** and **Drift Mode Only**, which is dimmed and can't be changed while Drift Stick is disabled.
   - OTHERS now has an ESP Sport button (the same setting as the main page's ESP button) and the auto start/stop button, which shows the standard auto start/stop symbol (an "A" in a circular arrow) instead of "ASS".
+
+Starting from v2.8.0, everything is on one page:
+
+- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/DriveModeFan.qml`)
+  - A column of buttons runs down the left edge, top to bottom: LC, ESP Sport, drive mode, auto start/stop and Drift Stick. Each ring is lit in the gauges' blue while its setting is on. The gauges are slightly smaller (210 px) to make room.
+  - The drive mode button shows the current mode. Tapping it dims the page and fans all five modes out in an arc to its right, the current one lit. It sits in the middle of the column so the fan has the full screen height. Picking a mode sends it to the ESP32 and closes the fan. Tapping the drive mode button again, anywhere else, or waiting 8 seconds closes it without a change.
+  - The right column runs the full height with four rows: front and rear tire pressures, then the RDU clutch temps above the RDU torque, so all four RDU values are always shown. They're labelled like the tire pressures: Temps and Torque on their rows, with RDU centred between them. Tapping the RDU row no longer switches between them. The logo is gone to make room.
+  - The settings button is at the top left, beside the close button.
+
+- **Drive mode page removed** (`SyncMyMod/app/SecondaryView.qml`)
+  - Its buttons are on the main view now. The All Modes / Drift Only choice for Drift Stick is a toggle on the settings page (`SyncMyMod/app/SettingsView.qml`), still dimmed and locked while Drift Stick is disabled. The settings page's back button returns to the main view.
 
 ## Testing on a PC
 
@@ -141,4 +150,16 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - RDU clutch temps now turn red above 105 °C (was 120 °C, the top of the scale), with a red mark at 105
 - Tire pressures now turn red below 35 psi and above 50 psi (was 1.9 / 3.0 bar, about 27.6 / 43.5 psi), with blue and red marks at those limits
 - Harness: added drive mode page, RDU row toggle and tire pressure scenarios, and checks for the new main view layout
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.8.0JC] - 2026-09-27
+- Main view: added a column of buttons down the left edge for LC, ESP Sport, drive mode, auto start/stop and Drift Stick, in that order; LC moved there from between the big gauges, and the big gauges are 210 px (was 220 px)
+- Main view: the drive mode button shows the current mode and fans the five modes out in an arc to its right; tapping it again, tapping outside, or 8 seconds without a pick closes the fan without a change
+- Main view: added the settings button (top left, beside the close button)
+- Main view: removed the logo; the right column now shows the RDU clutch temps above the RDU torque, so all four RDU values are always visible, replacing the tap-to-switch RDU row; labelled like the TPMS rows (Temps, RDU, Torque), with the RDU values slightly smaller so four-digit torque clears the label
+- Buttons and drive modes are lit in the gauges' blue (was green)
+- Removed the drive mode page; its All Modes / Drift Only toggle is now on the settings page as "Drift Stick", locked while Drift Stick is disabled
+- Settings page: the back button returns to the main view
+- Removed the `checkDummyGauges()` helper and the flag that triggered it from `fetchData()` / `sendData()` (the drive mode button reads the mode directly)
+- Harness: added main view button, drive mode fan, RDU rows and Drift Stick setting scenarios, and layout checks for the button column and the four right-hand rows; removed the drive mode page and RDU row toggle scenarios
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

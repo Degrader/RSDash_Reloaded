@@ -22,6 +22,8 @@ Rectangle {
     property color secondaryColor
     property int nameSize
     property int valueSize
+    // Moves the value sideways, e.g. away from a label between two gauges
+    property int valueOffset: 0
 
     property int size
     property int thick
@@ -117,6 +119,7 @@ Rectangle {
         Text {
             id: gaugeValueText
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: valueOffset
             font.pixelSize: valueSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
