@@ -37,7 +37,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from PyQt5 import sip
 from PyQt5.QtCore import (QPoint, Qt, QTimer, QUrl, QtCriticalMsg, QtDebugMsg,
                           QtFatalMsg, QtInfoMsg, QtWarningMsg, qInstallMessageHandler)
-from PyQt5.QtGui import QGuiApplication
+from PyQt5.QtGui import QGuiApplication, QImage
 from PyQt5.QtQml import QJSValue, QQmlComponent, QQmlExpression
 from PyQt5.QtQuick import QQuickItem, QQuickView
 from PyQt5.QtTest import QTest
@@ -101,6 +101,18 @@ def strip_comments_and_strings(source):
     source = re.sub(r"'(\\.|[^'\\\n])*'", "''", source)
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
     return re.sub(r"//[^\n]*", "", source)
+
+
+def opaque_bounds(path):
+    """(left, top, right, bottom) of an image's visible pixels, in image pixels."""
+    image = QImage(str(path))
+    xs, ys = [], []
+    for y in range(image.height()):
+        for x in range(image.width()):
+            if image.pixel(x, y) >> 24 > 16:
+                xs.append(x)
+                ys.append(y)
+    return min(xs), min(ys), max(xs) + 1, max(ys) + 1
 
 
 def static_checks():
@@ -290,7 +302,7 @@ def scenario(fn):
 def gauges_alone(h):
     """OBD Alone: Oil on top, lambda below it, live values arriving."""
     h.start_app()
-    h.check(h.eval("lambdaGauge.visible && !clutchTempGauge.visible"), "lambda shown, split clutch gauge hidden")
+    h.check(h.eval("lambdaGauge.visible && !torqueSplitGauge.visible"), "lambda shown, torque split gauge hidden")
     h.check(h.eval("oilGauge.x === lambdaGauge.x && oilGauge.y < lambdaGauge.y"), "Oil sits directly above lambda")
     h.check(h.eval("oilGauge.currentValue") == 92, "oil temp received from the ESP32")
     h.check(abs(h.eval("lambdaGauge.currentValue") - 0.98) < 1e-9, "lambda received from the ESP32")
@@ -311,6 +323,30 @@ def gauges_alone(h):
             "big gauges and the right column fit side by side on 800 px")
     h.check(h.eval("rduGauge.y >= ptuGauge.y + ptuGauge.height && rduGauge.y + rduGauge.height <= 480"),
             "both rows of big gauges fit on 480 px")
+    h.check(h.eval("(function() {"
+                   "  var cx = (ptuGauge.x + oilGauge.x + oilGauge.width) / 2, cy = (ptuGauge.y + rduGauge.y + rduGauge.height) / 2;"
+                   "  return Math.abs(nutronLogo.x + nutronLogo.width / 2 - cx) < 1"
+                   "      && Math.abs(nutronLogo.y + nutronLogo.height / 2 - cy) < 1; })()"),
+            "logo centred between the four big gauges")
+    # The visible part of the logo at its 1.1x pulse vs each ring's outer
+    # edge, counting the indicator dot (radius 14, 5 px stroke) that rides on
+    # the ring. The logo scales about its centre.
+    left, top, right, bottom = opaque_bounds(APP / "res" / "nutron.png")
+    h.check(h.eval("(function() {"
+                   "  var s = 1.1, iw = nutronLogo.sourceSize.width, ih = nutronLogo.sourceSize.height;"
+                   "  var k = nutronLogo.paintedHeight / ih;"
+                   "  var cx = nutronLogo.x + nutronLogo.width / 2, cy = nutronLogo.y + nutronLogo.height / 2;"
+                   "  var lx = cx + ((%f + %f) / 2 - iw / 2) * k * s, ly = cy + ((%f + %f) / 2 - ih / 2) * k * s;"
+                   "  var hw = (%f - %f) / 2 * k * s, hh = (%f - %f) / 2 * k * s;"
+                   % (left, right, top, bottom, right, left, bottom, top) +
+                   "  return [ptuGauge, oilGauge, rduGauge, lambdaGauge].every(function(g) {"
+                   "    var dx = Math.max(0, Math.abs(g.x + g.width / 2 - lx) - hw);"
+                   "    var dy = Math.max(0, Math.abs(g.y + g.height / 2 - ly) - hh);"
+                   "    return Math.sqrt(dx * dx + dy * dy) >= g.width / 2 - g.thick + 14 + 2.5;"
+                   "  });"
+                   "})()"),
+            "logo clears all four rings and indicator dots at the top of its pulse")
+    h.check(h.eval("pulseTimer.running && pulseTimer.repeat && nutronLogo.scale !== 1"), "logo is pulsing")
     h.check(h.eval("settingsButton.x >= closeButton.x + closeButton.width && settingsButton.y === closeButton.y"
                    " && settingsButton.x + settingsButton.width <= ptuGauge.x"),
             "settings button beside the close button, left of the gauges")
@@ -329,12 +365,18 @@ def gauges_alone(h):
 
 @scenario
 def gauges_not_alone(h):
-    """OBD Not Alone (set on the ESP32): the split RDU clutch gauge replaces lambda."""
+    """OBD Not Alone (set on the ESP32): the RDU torque split gauge replaces lambda."""
     h.start_app(settings={"cobbFriendly": 1})
     h.check(h.eval("notAlone"), "app picked up Not Alone from the ESP32")
-    h.check(h.eval("clutchTempGauge.visible && !lambdaGauge.visible"), "split clutch gauge shown in lambda's place")
-    h.check(h.eval("[clutchTempGauge.leftValue, clutchTempGauge.rightValue]") == [71, 74], "left/right clutch temps")
-    h.check(h.eval("clutchTempGauge.caption") == "OBD\nNOT ALONE", "caption reads OBD / NOT ALONE")
+    h.check(h.eval("torqueSplitGauge.visible && !lambdaGauge.visible"), "torque split gauge shown in lambda's place")
+    # Default mock torque: 120 Nm left, 135 Nm right
+    split = h.eval("[torqueSplitGauge.leftValue, torqueSplitGauge.rightValue]")
+    h.check(abs(split[0] - 100 * 120 / 255) < 1e-9 and abs(split[1] - 100 * 135 / 255) < 1e-9,
+            "left/right share of the rear torque: 47% / 53%")
+    h.check(h.eval("torqueSplitGauge.name") == "Torque Split", "named Torque Split")
+    h.check(h.eval("torqueSplitGauge.caption") == "OBD\nNOT ALONE", "caption reads OBD / NOT ALONE")
+    h.check(h.eval("torqueSplitGauge.highTreshold >= torqueSplitGauge.maxValue && torqueSplitGauge.lowTreshold <= 0"),
+            "a share never turns the gauge red")
     h.shot("gauges_not_alone")
 
 
@@ -352,9 +394,8 @@ def rdu_rows(h):
                    " - (leftRDUTempGauge.y + leftRDUTempGauge.height + leftRDUTqGauge.y) / 2) < 1"
                    " && Math.abs(rduText.x + rduText.width / 2 - sensorArea.width / 2) < 1"),
             "same sizes as the TPMS labels, with RDU centred between the four RDU gauges")
-    h.check(h.eval("leftRDUTempGauge.highTreshold === 105 && rightRDUTempGauge.highTreshold === 105"
-                   " && clutchTempGauge.highTreshold === 105"),
-            "clutch temp red line is 105 C on every clutch gauge")
+    h.check(h.eval("leftRDUTempGauge.highTreshold === 105 && rightRDUTempGauge.highTreshold === 105"),
+            "clutch temp red line is 105 C on both clutch gauges")
     h.shot("rdu_rows")
     h.click("leftRDUTempGauge")
     h.click("leftRDUTqGauge")
@@ -378,6 +419,18 @@ def tire_pressure_limits(h):
 
 
 @scenario
+def torque_split_idle(h):
+    """Not Alone torque split: all torque on one side reads 100 / 0; under 10 Nm total both halves read 0."""
+    h.start_app(settings={"cobbFriendly": 1}, pids={"rdutql": 0, "rdutqr": 400})
+    h.check(h.eval("[torqueSplitGauge.leftValue, torqueSplitGauge.rightValue]") == [0, 100], "all on the right: 0% / 100%")
+    h.shot("torque_split_right")
+    with h.mock.lock:
+        h.mock.pids.update({"rdutql": 4, "rdutqr": 5})
+    h.check(h.wait_until("torqueSplitGauge.leftValue === 0 && torqueSplitGauge.rightValue === 0", 2000),
+            "9 Nm total: both halves read 0 instead of 44% / 56%")
+
+
+@scenario
 def gauge_tap_does_nothing(h):
     """Tapping the lambda / split gauge no longer changes the OBD mode."""
     h.start_app()
@@ -385,21 +438,20 @@ def gauge_tap_does_nothing(h):
     h.wait(300)
     h.check(not h.mock.posts, "tapping lambda sent nothing to the ESP32")
     h.start_app(settings={"cobbFriendly": 1})
-    h.click("clutchTempGauge")
+    h.click("torqueSplitGauge")
     h.wait(300)
     h.check(not h.mock.posts, "tapping the split gauge sent nothing to the ESP32")
 
 
 @scenario
 def main_page_buttons(h):
-    """LC, Drift Stick, ESP and auto start/stop in the left column show and change the ESP32's settings."""
+    """LC, ESP and auto start/stop in the left column show and toggle the ESP32's settings."""
     h.start_app(settings={"enableLC": 1, "enableDriftMode": 1, "esp": 1, "disableStartStop": 1})
     h.check(h.eval("[lcGauge.currentValue, driftStickGauge.currentValue, espGauge.currentValue,"
                    " autoStartStopGauge.currentValue]") == [1, 1, 1, 1],
-            "all four buttons lit from the ESP32's settings")
+            "LC, Drift Stick, ESP and start/stop lit from the ESP32's settings")
     h.shot("main_page_buttons")
-    for item, key in (("lcGauge", "enableLC"), ("driftStickGauge", "enableDriftMode"),
-                      ("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
+    for item, key in (("lcGauge", "enableLC"), ("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
         h.click(item)
         h.wait(300)
         h.check(h.mock.posts[-1:] == [{key: 0}] and h.eval("%s.currentValue" % item) == 0,
@@ -408,6 +460,26 @@ def main_page_buttons(h):
         h.wait(300)
         h.check(h.mock.posts[-1:] == [{key: 1}] and h.eval("%s.currentValue" % item) == 1,
                 "and tapping again turned it back on")
+
+
+def check_fan_layout(h, fan, hub, count):
+    """Checks an open RadialFan's option buttons: on screen, not overlapping, clear of the column."""
+    buttons = "[%s]" % ", ".join("%s.optionButton(%d)" % (fan, i) for i in range(count))
+    h.check(h.eval("%s.every(function(b) { var p = b.mapToItem(null, 0, 0);"
+                   " return p.x >= 0 && p.y >= 0 && p.x + b.width <= 800 && p.y + b.height <= 480; })" % buttons),
+            "all %d options fit on the 800x480 screen" % count)
+    h.check(h.eval("(function(){ var items = %s.concat([%s]);"
+                   " function c(b) { return b.mapToItem(null, b.width / 2, b.height / 2); }"
+                   " for (var i = 0; i < items.length; i++) for (var j = i + 1; j < items.length; j++) {"
+                   " var a = c(items[i]), b = c(items[j]);"
+                   " if (Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) < (items[i].width + items[j].width) / 2)"
+                   " return false; } return true; })()" % (buttons, hub)),
+            "options don't overlap each other or %s" % hub)
+    h.check(h.eval("%s.every(function(b) { return b.mapToItem(null, 0, 0).x >= buttonColumn.x + buttonColumn.width; })"
+                   % buttons), "options clear the button column")
+    h.check(h.eval("(function(){ var ys = %s.map(function(b) { return b.y; });"
+                   " for (var i = 1; i < ys.length; i++) if (ys[i] <= ys[i - 1]) return false; return true; })()"
+                   % buttons), "options run top to bottom in order")
 
 
 @scenario
@@ -420,33 +492,19 @@ def drive_mode_fan(h):
     h.click("driveModeGauge")
     h.wait(300)
     h.check(h.eval("driveModeFan.visible && driveModeFan.progress === 1"), "tapping the button opens the fan")
-    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.modeButton(i).currentValue; })")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).name; })")
+            == ["Normal", "Sport", "Track", "Drift", "Custom"], "Normal to Custom")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).currentValue; })")
             == [0, 0, 1, 0, 0], "only Track is lit in the fan")
-    h.check(h.eval("(function(){ for (var i = 0; i < 5; i++) { var b = driveModeFan.modeButton(i);"
-                   " var p = b.mapToItem(null, 0, 0);"
-                   " if (p.x < 0 || p.y < 0 || p.x + b.width > 800 || p.y + b.height > 480) return false; }"
-                   " return true; })()"), "all five mode buttons fit on the 800x480 screen")
-    h.check(h.eval("(function(){ var items = [driveModeFan.modeButton(0), driveModeFan.modeButton(1),"
-                   " driveModeFan.modeButton(2), driveModeFan.modeButton(3), driveModeFan.modeButton(4), driveModeGauge];"
-                   " function c(b) { return b.mapToItem(null, b.width / 2, b.height / 2); }"
-                   " for (var i = 0; i < items.length; i++) for (var j = i + 1; j < items.length; j++) {"
-                   " var a = c(items[i]), b = c(items[j]);"
-                   " if (Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) < (items[i].width + items[j].width) / 2)"
-                   " return false; } return true; })()"),
-            "mode buttons don't overlap each other or the drive mode button")
-    h.check(h.eval("[0, 1, 2, 3, 4].every(function(i) { var b = driveModeFan.modeButton(i);"
-                   " return b.mapToItem(null, 0, 0).x >= buttonColumn.x + buttonColumn.width; })"),
-            "mode buttons clear the button column")
-    h.check(h.eval("(function(){ var ys = [0, 1, 2, 3, 4].map(function(i) { return driveModeFan.modeButton(i).y; });"
-                   " var track = driveModeFan.modeButton(2);"
-                   " return ys[0] < ys[1] && ys[1] < ys[2] && ys[2] < ys[3] && ys[3] < ys[4]"
-                   " && Math.abs(track.mapToItem(null, 0, track.height / 2).y"
+    check_fan_layout(h, "driveModeFan", "driveModeGauge", 5)
+    h.check(h.eval("(function(){ var track = driveModeFan.optionButton(2);"
+                   " return Math.abs(track.mapToItem(null, 0, track.height / 2).y"
                    " - driveModeGauge.mapToItem(null, 0, driveModeGauge.height / 2).y) < 1; })()"),
-            "Normal to Custom top to bottom, with Track level with the drive mode button")
+            "Track level with the drive mode button")
     h.shot("drive_mode_fan")
 
     posts_before = len(h.mock.posts)
-    h.click("driveModeFan.modeButton(1)")
+    h.click("driveModeFan.optionButton(1)")
     h.wait(300)
     h.check(h.mock.posts[posts_before:] == [{"driveMode": 1}], "tapping Sport sent driveMode=1 and nothing else")
     h.check(h.wait_until("!driveModeFan.visible", 1000), "fan closes after a pick")
@@ -455,7 +513,7 @@ def drive_mode_fan(h):
     # Custom is driveMode 5 (4 isn't used)
     h.click("driveModeGauge")
     h.wait(300)
-    h.click("driveModeFan.modeButton(4)")
+    h.click("driveModeFan.optionButton(4)")
     h.wait(300)
     h.check(h.mock.posts[-1:] == [{"driveMode": 5}], "tapping Custom sent driveMode=5")
 
@@ -481,6 +539,71 @@ def drive_mode_fan(h):
 
 
 @scenario
+def drift_stick_fan(h):
+    """Drift Stick fans out All Modes / Drift Only / Off; each pick sends only what changes."""
+    h.start_app(settings={"enableDriftMode": 0, "driftInAllModes": 0})
+    h.check(h.eval("driftStickGauge.currentValue") == 0 and h.eval("driftStickGauge.statusText") == "Off",
+            "starts off, and the button says so")
+
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.check(h.eval("driftStickFan.visible && !driveModeFan.visible"), "tapping Drift Stick opens its own fan")
+    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).name; })")
+            == ["All\nModes", "Drift\nOnly", "Off"], "All Modes, Drift Only, Off from the top")
+    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).currentValue; })") == [0, 0, 1],
+            "only Off is lit")
+    check_fan_layout(h, "driftStickFan", "driftStickGauge", 3)
+    h.shot("drift_stick_fan")
+
+    # Off -> All Modes: turn it on, then set all modes
+    posts_before = len(h.mock.posts)
+    h.click("driftStickFan.optionButton(0)")
+    h.check(h.wait_until("driftStickChoice === 2", 1500), "picking All Modes turned it on in all modes")
+    h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 1}, {"driftInAllModes": 1}],
+            "sent enableDriftMode=1, then driftInAllModes=1")
+    h.check(h.eval("driftStickGauge.currentValue === 1 && driftStickGauge.statusText === 'All Modes'"),
+            "button lit, status All Modes")
+
+    # All Modes -> Drift Only: already on, so only the mode choice
+    posts_before = len(h.mock.posts)
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).currentValue; })") == [1, 0, 0],
+            "All Modes lit when reopened")
+    h.click("driftStickFan.optionButton(1)")
+    h.check(h.wait_until("driftStickChoice === 1", 1500), "picking Drift Only switched to Drift mode only")
+    h.check(h.mock.posts[posts_before:] == [{"driftInAllModes": 0}], "sent only driftInAllModes=0")
+    h.check(h.eval("driftStickGauge.statusText") == "Drift Only", "status Drift Only")
+
+    # Drift Only -> Off: only the on/off switch
+    posts_before = len(h.mock.posts)
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.click("driftStickFan.optionButton(2)")
+    h.check(h.wait_until("driftStickChoice === 0", 1500), "picking Off turned it off")
+    h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 0}], "sent only enableDriftMode=0")
+
+    # Picking the current choice sends nothing
+    posts_before = len(h.mock.posts)
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.click("driftStickFan.optionButton(2)")
+    h.wait(300)
+    h.check(len(h.mock.posts) == posts_before and not h.eval("driftStickFan.visible"),
+            "picking Off again closes the fan and sends nothing")
+
+    # If the ESP32 rejects turning it on, the mode choice isn't sent
+    h.mock.post_status = 500
+    posts_before = len(h.mock.posts)
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.click("driftStickFan.optionButton(0)")
+    h.wait(600)
+    h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 1}] and h.eval("driftStickChoice") == 0,
+            "rejected: only the switch was tried, and it still shows Off")
+
+
+@scenario
 def settings_obd_toggle(h):
     """Flip OBD on the settings page and back; the gauge page follows."""
     h.start_app()
@@ -497,14 +620,14 @@ def settings_obd_toggle(h):
     h.shot("settings_not_alone")
 
     h.goto_gauges()
-    h.check(h.eval("clutchTempGauge.visible && !lambdaGauge.visible"), "gauge page shows the split clutch gauge")
+    h.check(h.eval("torqueSplitGauge.visible && !lambdaGauge.visible"), "gauge page shows the torque split gauge")
 
     h.goto_settings()
     h.click("obdToggle")
     h.check(h.wait_until("!notAlone"), "app switched back to Alone")
     h.check(h.mock.posts[-1:] == [{"cobbFriendly": 0}], "sent cobbFriendly=0 to the ESP32")
     h.goto_gauges()
-    h.check(h.eval("lambdaGauge.visible && !clutchTempGauge.visible"), "gauge page shows lambda again")
+    h.check(h.eval("lambdaGauge.visible && !torqueSplitGauge.visible"), "gauge page shows lambda again")
 
 
 @scenario
@@ -515,31 +638,6 @@ def settings_obd_refresh(h):
         h.mock.settings["cobbFriendly"] = 1  # changed elsewhere, before the main page's next 5 s check
     h.goto_settings()
     h.check(h.wait_until("obdToggle.currentState === 'Not Alone'", 1500), "toggle shows Not Alone as soon as settings opens")
-
-
-@scenario
-def settings_drift_in(h):
-    """The settings page's Drift Stick toggle picks All Modes / Drift Only, and is locked while Drift Stick is off."""
-    h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1})
-    h.goto_settings()
-    h.check(h.wait_until("driftInToggle.currentState === 'All Modes'", 1500), "toggle shows All Modes from the ESP32")
-    h.click("driftInToggle")
-    h.wait(300)
-    h.check(h.mock.posts[-1:] == [{"driftInAllModes": 0}], "tapping it sent driftInAllModes=0")
-    h.check(h.eval("driftInToggle.currentState") == "Drift Only", "toggle now shows Drift Only")
-    h.shot("settings_drift_in")
-
-    h.goto_gauges()
-    h.click("driftStickGauge")
-    h.wait(300)
-    h.check(h.mock.posts[-1:] == [{"enableDriftMode": 0}], "turned Drift Stick off on the main page")
-    h.goto_settings()
-    h.check(h.wait_until("driftInToggle.opacity < 1", 1500), "toggle dimmed while Drift Stick is off")
-    posts_before = len(h.mock.posts)
-    h.click("driftInToggle")
-    h.wait(300)
-    h.check(len(h.mock.posts) == posts_before and h.eval("driftInToggle.currentState") == "Drift Only",
-            "and it can't be changed")
 
 
 @scenario
@@ -664,7 +762,12 @@ def render_readme_shots(h):
     h.click("driveModeGauge")
     h.wait(300)
     h.shot("drive_mode_fan", README_SHOTS)
-    h.click("driveModeFan.modeButton(2)")
+    h.click("driveModeFan.optionButton(2)")
+    h.wait(300)
+    h.click("driftStickGauge")
+    h.wait(300)
+    h.shot("drift_stick_fan", README_SHOTS)
+    h.click("driftStickFan.optionButton(0)")
     h.wait(300)
     h.goto_settings()
     h.shot("settings", README_SHOTS)

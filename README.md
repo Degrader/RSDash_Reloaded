@@ -6,13 +6,21 @@ RSdash is a free application specifically developed for the Ford Focus RS MK3.5.
 
 All credit for the original design, the gauge layout, and the ESP32 firmware goes to the original authors above. This fork keeps their app intact and focuses on tightening up performance on the Sync 3 head unit, plus a few layout and settings changes.
 
+## Video tour
+
+![RSdash tour: live gauges, LC / ESP / auto start-stop buttons, the drive mode and Drift Stick fans, settings, OBD Not Alone and Ready To Race](docs/tour.gif)
+
+A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by `dev/tour.py`, against the fake ESP32 with its values drifting. To re-record it after a UI change, run `python dev/tour.py`.
+
 ## Screenshots
 
 | Main view | Main view, OBD Not Alone |
 |:---:|:---:|
-| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left; PTU, oil, RDU and lambda gauges; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with both RDU clutch temps in place of lambda](docs/screenshots/main_view_not_alone.png) |
-| **Drive mode fan** (tap the mode button) | **Settings** |
-| ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Settings page: temperature, pressure and torque units, the OBD mode, and which modes Drift Stick works in](docs/screenshots/settings.png) |
+| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left; PTU, oil, RDU and lambda gauges with the logo between them; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
+| **Drive mode fan** (tap the mode button) | **Drift Stick fan** (tap Drift Stick) |
+| ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Drift Stick fan: All Modes, Drift Only and Off in an arc up and to the right of the Drift Stick button, with the current choice lit](docs/screenshots/drift_stick_fan.png) |
+| **Settings** | |
+| ![Settings page: temperature, pressure and torque units, and the OBD mode](docs/screenshots/settings.png) | |
 
 These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
@@ -65,6 +73,18 @@ Starting from v2.8.0, everything is on one page:
 
 - **Drive mode page removed** (`SyncMyMod/app/SecondaryView.qml`)
   - Its buttons are on the main view now. The All Modes / Drift Only choice for Drift Stick is a toggle on the settings page (`SyncMyMod/app/SettingsView.qml`), still dimmed and locked while Drift Stick is disabled. The settings page's back button returns to the main view.
+
+Starting from v2.9.0, OBD Not Alone mode shows the RDU torque split, and Drift Stick has its own fan:
+
+- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/SplitPlasmaGauge.qml`)
+  - With the RDU clutch temps always in the right column, the gauge that replaces lambda in Not Alone mode now shows how the rear torque is split between the left and right clutches: each half is that clutch's share of the total, in %. It's worked out from the RDU torque values, which keep updating in Not Alone mode, so it needs no firmware change.
+  - Below 10 Nm total (cruising or parked) there's no real split, so both halves read 0 instead of jumping around. A share never turns the gauge red.
+  - The logo is back, centred between the four big gauges and pulsing.
+
+- **Drift Stick fan** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/RadialFan.qml`)
+  - Tapping Drift Stick fans out three choices up and to the right: **All Modes**, **Drift Only** and **Off**, with the current one lit. The button is lit while Drift Stick is on, and its status line shows the current choice.
+  - Each pick sends only what changes. Turning it on sends `enableDriftMode` first, and the All Modes / Drift Only choice (`driftInAllModes`) only once the ESP32 accepts, the same order the old buttons used. The settings page toggle is gone.
+  - The drive mode fan is now the general `RadialFan` component, used by both buttons.
 
 ## Testing on a PC
 
@@ -162,4 +182,15 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Settings page: the back button returns to the main view
 - Removed the `checkDummyGauges()` helper and the flag that triggered it from `fetchData()` / `sendData()` (the drive mode button reads the mode directly)
 - Harness: added main view button, drive mode fan, RDU rows and Drift Stick setting scenarios, and layout checks for the button column and the four right-hand rows; removed the drive mode page and RDU row toggle scenarios
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.9.0JC] - 2026-09-27
+- OBD Not Alone: the gauge in lambda's place shows the RDU torque split (each rear clutch's share of the total, in %) instead of the RDU clutch temps, which are now always in the right column
+- Torque split reads 0 / 0 below 10 Nm total rear torque, and never turns red
+- Main view: the logo is back, centred between the four big gauges, pulsing as before (50 px tall, as it was at the top of the right column)
+- `SplitPlasmaGauge` has a `valueSpread` setting for how far apart its two values sit
+- Main view: tapping Drift Stick fans out All Modes / Drift Only / Off, replacing the on/off tap and the settings page's Drift Stick toggle; the button's status shows the current choice
+- `DriveModeFan` is now `RadialFan`, a general fan with its options and direction set by the page
+- Added a video tour (`docs/tour.gif`, `docs/tour.mp4`), recorded by `dev/tour.py`
+- Harness: Not Alone checks cover the torque split; added scenarios for all torque on one side and low torque, and for the Drift Stick fan (including a rejected change); shared fan layout checks; removed the settings page Drift Stick scenario
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

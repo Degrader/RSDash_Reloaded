@@ -24,24 +24,6 @@ Rectangle {
         Controller.getVersion()
         // Refresh the OBD mode in case it was changed from the RSapp phone app
         Controller.checkNotAlone()
-        Controller.fetchData("settings", driftSettingsData)
-    }
-
-    // Drift Stick itself is switched on the main page; this page only sets
-    // which drive modes it works in, which can't change while it's off.
-    property var driftSettingsData: [
-        { gaugeId: driftStickState,     param: "enableDriftMode" },
-        { gaugeId: driftInState,        param: "driftInAllModes" }
-    ]
-
-    Item {
-        id: driftStickState
-        property real currentValue: 0
-    }
-
-    Item {
-        id: driftInState
-        property real currentValue: 0
     }
 
     // Set while a new OBD mode is being sent to the ESP32, so a second
@@ -108,8 +90,7 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: 20
-        spacing: 16
+        spacing: 20
 
         CustomToggle {
             id: temperatureToggle
@@ -187,27 +168,6 @@ Rectangle {
                 onClicked: {
                     mouse.accepted = false
                     setNotAlone(!notAlone)
-                }
-            }
-        }
-
-        // Which drive modes Drift Stick works in. Dimmed and locked while
-        // Drift Stick is off.
-        CustomToggle {
-            id: driftInToggle
-            label: "Drift Stick"
-            option1: "All Modes"
-            option2: "Drift Only"
-            currentState: driftInState.currentValue === 1 ? option1 : option2
-            opacity: driftStickState.currentValue === 1 ? 1.0 : 0.4
-
-            MouseArea {
-                id: driftInToggleMouseArea
-                anchors.fill: parent
-                enabled: driftStickState.currentValue === 1
-                onClicked: {
-                    var newValue = driftInState.currentValue === 1 ? 0 : 1
-                    Controller.sendData("settings", "driftInAllModes", newValue, driftInState)
                 }
             }
         }

@@ -41,7 +41,8 @@ Rectangle {
         { gaugeId: driftStickGauge,     param: "enableDriftMode" },
         { gaugeId: espGauge,            param: "esp" },
         { gaugeId: autoStartStopGauge,  param: "disableStartStop" },
-        { gaugeId: driveModeState,      param: "driveMode" }
+        { gaugeId: driveModeState,      param: "driveMode" },
+        { gaugeId: driftInState,        param: "driftInAllModes" }
     ]
 
     Image {
@@ -275,18 +276,24 @@ Rectangle {
         startAngleDegrees: 145
         endAngleDegrees: 395
 
-        // OBD "Alone" - see clutchTempGauge for "Not Alone"
+        // OBD "Alone" - see torqueSplitGauge for "Not Alone"
         visible: !notAlone
     }
 
     // In OBD "Not Alone" mode (settings page) the ESP32 stops requesting
-    // lambda, the only value it asks the PCM for, so this slot shows both
-    // RDU clutch temps instead - they come from the AWD module and keep
-    // updating.
+    // lambda, the only value it asks the PCM for, so this slot shows how the
+    // rear torque is split between the left and right RDU clutches instead:
+    // each half is that clutch's share of the total, in %. The clutch torques
+    // come from the AWD module and keep updating.
     SplitPlasmaGauge {
-        id: clutchTempGauge
+        id: torqueSplitGauge
         anchors.fill: lambdaGauge
         visible: notAlone
+
+        // Below this total (Nm) there's no real split to show, e.g. cruising
+        // or parked, so both halves read 0 instead of jumping around.
+        readonly property real minTotal: 10
+        readonly property real total: leftRDUTqGauge.currentValue + rightRDUTqGauge.currentValue
 
         thick: 24
 
@@ -294,27 +301,69 @@ Rectangle {
         captionColor: "#329BFD"
         captionSize: 14
 
-        name: "RDU Clutch"
+        name: "Torque Split"
         nameSize: 20
 
-        unitSymbol: "°"
+        unitSymbol: "%"
 
         primaryColor: "#0c32ff"
         secondaryColor: "#ce1845"
 
-        valueSize: 26
+        // Spread out so "47%" and "53%" don't run together; "100%" still
+        // clears the ring
+        valueSize: 24
+        valueSpread: 40
         decimal: 0
-        measureType: "temperature"
+        measureType: "raw"
 
-        // Clutch temps: 0-120 C scale, red line at 105 C per clutch
         minValue: 0
-        maxValue: 120
+        maxValue: 100
 
+        // A share is never "too high" or "too low", so it never turns red
         lowTreshold: 0
-        highTreshold: 105
+        highTreshold: 100
 
-        leftValue: leftRDUTempGauge.currentValue
-        rightValue: rightRDUTempGauge.currentValue
+        leftValue: total >= minTotal ? 100 * leftRDUTqGauge.currentValue / total : 0
+        rightValue: total >= minTotal ? 100 * rightRDUTqGauge.currentValue / total : 0
+    }
+
+    // Centred between the four big gauges, pulsing. The image has
+    // transparent space above and below the artwork, so at 50 px tall the
+    // visible part still clears all four rings (and their indicator dots)
+    // at the top of its pulse.
+    Image {
+        id: nutronLogo
+        height: 50
+        x: (ptuGauge.x + oilGauge.x + oilGauge.width) / 2 - width / 2
+        y: (ptuGauge.y + rduGauge.y + rduGauge.height) / 2 - height / 2
+        fillMode: Image.PreserveAspectFit
+        source: "res/nutron.png"
+        smooth: true
+        mipmap: true
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 3000
+                easing.type: Easing.InOutQuad
+            }
+        }
+
+        Timer {
+            id: pulseTimer
+            interval: 3000
+            repeat: true
+            running: true
+            triggeredOnStart: true
+            onTriggered: {
+                if (scaleUp) {
+                    nutronLogo.scale = 1.1
+                } else {
+                    nutronLogo.scale = 1.0
+                }
+                scaleUp = !scaleUp
+            }
+            property bool scaleUp: true
+        }
     }
 
     // Controls down the left edge, under the close button. Each ring is lit
@@ -453,8 +502,8 @@ Rectangle {
             }
         }
 
-        // Which modes it works in (All Modes / Drift Mode Only) is on the
-        // settings page
+        // Lit while Drift Stick is on; the status shows where it works.
+        // Tapping it fans out Off / Drift Only / All Modes.
         ButtonGauge {
             id: driftStickGauge
             width: size
@@ -464,6 +513,10 @@ Rectangle {
 
             name: "Drift\nStick"
             nameSize: 14
+            nameOffset: -5
+            statusText: driftStickFan.nameFor(driftStickChoice).replace("\n", " ")
+            statusOffset: 20
+            showStatus: 1
 
             primaryColor: "#0c32ff"
 
@@ -476,18 +529,48 @@ Rectangle {
             MouseArea {
                 id: driftStickButton
                 anchors.fill: parent
-                onClicked: {
-                    var newValue = driftStickGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "enableDriftMode", newValue, driftStickGauge)
-                }
+                onClicked: driftStickFan.open = true
             }
         }
     }
 
-    // The ESP32's driveMode, shown by driveModeGauge and the fan
+    // The ESP32's driveMode, shown by driveModeGauge and its fan
     Item {
         id: driveModeState
         property real currentValue: 0
+    }
+
+    // The ESP32's driftInAllModes: whether Drift Stick works in every drive
+    // mode (1) or only in Drift (0)
+    Item {
+        id: driftInState
+        property real currentValue: 0
+    }
+
+    // Drift Stick as one choice: 0 off, 1 Drift mode only, 2 all modes
+    readonly property int driftStickChoice: driftStickGauge.currentValue !== 1 ? 0
+                                            : (driftInState.currentValue === 1 ? 2 : 1)
+
+    // Sends only what changes. Turning it on goes first and the mode choice
+    // follows once the ESP32 accepts, the same order as the old buttons.
+    function setDriftStick(choice) {
+        if (choice === 0) {
+            if (driftStickGauge.currentValue !== 0)
+                Controller.sendData("settings", "enableDriftMode", 0, driftStickGauge)
+            return
+        }
+        var allModes = choice === 2 ? 1 : 0
+        var setModes = function() {
+            if (driftInState.currentValue !== allModes)
+                Controller.sendData("settings", "driftInAllModes", allModes, driftInState)
+        }
+        if (driftStickGauge.currentValue !== 1) {
+            Controller.sendData("settings", "enableDriftMode", 1, driftStickGauge, function(ok) {
+                if (ok) setModes()
+            })
+        } else {
+            setModes()
+        }
     }
     // Right column, four rows: front and rear tire pressures, RDU clutch
     // temps and RDU torque, all shown at once.
@@ -660,8 +743,7 @@ Rectangle {
             reverse: true
         }
 
-        // RDU clutch temps: 0-120 C scale, red line at 105 C. These also
-        // feed the split gauge that replaces lambda in OBD Not Alone mode.
+        // RDU clutch temps: 0-120 C scale, red line at 105 C
         SemiCircularGauge {
             id: leftRDUTempGauge
             anchors.left: rearLeftTireGauge.left
@@ -751,7 +833,8 @@ Rectangle {
             text: "RDU"
         }
 
-        // RDU torque
+        // RDU torque. Also feeds the torque split gauge that replaces lambda
+        // in OBD Not Alone mode.
         SemiCircularGauge {
             id: leftRDUTqGauge
             anchors.left: leftRDUTempGauge.left
@@ -852,15 +935,40 @@ Rectangle {
         }
     }
 
-    // Last and above the Ready To Race popup, so it covers the whole page
-    // while open
-    DriveModeFan {
+    // The fans go last and above the Ready To Race popup, so each covers
+    // the whole page while open. The drive mode button is mid-column, so its
+    // fan opens straight right; Drift Stick is at the bottom, so its fan
+    // opens up and to the right.
+    RadialFan {
         id: driveModeFan
         anchors.fill: parent
         z: 1000
         hub: driveModeGauge
-        currentMode: driveModeState.currentValue
+        // driveMode values the ESP32 expects (4 isn't used)
+        options: [
+            { name: "Normal", value: 0 },
+            { name: "Sport",  value: 1 },
+            { name: "Track",  value: 2 },
+            { name: "Drift",  value: 3 },
+            { name: "Custom", value: 5 }
+        ]
+        currentValue: driveModeState.currentValue
         onPicked: Controller.sendData("settings", "driveMode", value, driveModeState)
+    }
+
+    RadialFan {
+        id: driftStickFan
+        anchors.fill: parent
+        z: 1000
+        hub: driftStickGauge
+        centerDegrees: -30
+        options: [
+            { name: "All\nModes", value: 2 },
+            { name: "Drift\nOnly", value: 1 },
+            { name: "Off",         value: 0 }
+        ]
+        currentValue: driftStickChoice
+        onPicked: setDriftStick(value)
     }
 
     Component.onCompleted: {

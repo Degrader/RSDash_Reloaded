@@ -38,6 +38,9 @@ Rectangle {
     // Degrees left clear between the two halves, at both top and bottom.
     property real gapDegrees: 20
 
+    // Distance of each value from the centre line
+    property int valueSpread: 36
+
     property real leftValue: 0
     property real rightValue: 0
 
@@ -122,7 +125,7 @@ Rectangle {
         Text {
             id: leftValueText
             anchors.centerIn: parent
-            anchors.horizontalCenterOffset: -36
+            anchors.horizontalCenterOffset: -valueSpread
             anchors.verticalCenterOffset: -8
             font.pixelSize: valueSize
             font.weight: Font.Bold
@@ -134,7 +137,7 @@ Rectangle {
         Text {
             id: rightValueText
             anchors.centerIn: parent
-            anchors.horizontalCenterOffset: 36
+            anchors.horizontalCenterOffset: valueSpread
             anchors.verticalCenterOffset: -8
             font.pixelSize: valueSize
             font.weight: Font.Bold

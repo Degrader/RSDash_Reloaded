@@ -34,6 +34,15 @@ This re-renders the screenshots shown in the main README into `docs/screenshots/
 
 The harness uses a real window parked off-screen, so it won't take focus. The app gets a temp copy of `NutronConfig.ini`, so your repo copy is never changed.
 
+## Video tour
+
+```
+python -m pip install imageio-ffmpeg
+python dev/tour.py
+```
+
+This records a tour of the app into `docs/tour.mp4` and `docs/tour.gif` (shown in the main README), which are committed. It drives the real app like the scenarios do, against the fake ESP32 with its values drifting, and adds a caption under each step and a ring where each tap lands. The app renders at 2x (1600x960) and is recorded at 30 fps, streamed straight into ffmpeg; the MP4 keeps the full 2x size, and the GIF is 800 px wide at 15 fps. The run prints how many frames had to be repeated to keep real-time pacing (about 7%). `imageio-ffmpeg` provides the ffmpeg build. Re-record it after a UI change.
+
 ## Clicking around yourself
 
 ```
@@ -47,6 +56,7 @@ Anything the app sends to the ESP32 is printed in the terminal.
 ## Files
 
 - `harness.py` - the runner and the scenarios. Add a new scenario by writing a function decorated with `@scenario`; `h.click("someId")`, `h.eval("js expression")`, `h.check(...)` and `h.shot("name")` cover most needs.
+- `tour.py` - records the video tour. The steps are in `run_tour()`; `tap()` and `say()` tap a control and set the caption.
 - `mock_esp32.py` - the fake ESP32. It serves `/pids` and `/settings` with the same JSON keys as the RSapp 2.8.1 firmware, and can be made slow, offline, or reject changes. It also runs on its own: `python dev/mock_esp32.py`.
 - `Host.qml` - stands in for the Sync 3 Custom Apps Loader, which provides `backMouseArea` and `back()` to the app.
 
