@@ -173,6 +173,34 @@ Rectangle {
         }
     }
 
+    // Opens a page explaining each control on the main view
+    Rectangle {
+        id: controlsHelpButton
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 10
+        anchors.bottomMargin: 10
+        width: 170
+        height: 40
+        radius: height / 2
+        color: "#1e1e1e"
+        border.color: "#0c32ff"
+        border.width: 2
+
+        Text {
+            anchors.centerIn: parent
+            font.pixelSize: 16
+            font.weight: Font.Bold
+            color: "#F8E63C"
+            text: "Controls Help"
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: loader.source = "ControlsHelpView.qml"
+        }
+    }
+
     Text {
         id: copyright
         anchors.bottom: parent.bottom

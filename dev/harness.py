@@ -697,6 +697,30 @@ def settings_obd_refresh(h):
 
 
 @scenario
+def controls_help(h):
+    """Settings' Controls Help button opens a page explaining each main view control; back returns to settings."""
+    h.start_app()
+    h.goto_settings()
+    h.check(h.eval("(function() { var p = controlsHelpButton.mapToItem(null, 0, 0);"
+                   " return p.x < 40 && p.y + controlsHelpButton.height > 440; })()"),
+            "Controls Help button in the bottom left of the settings page")
+    h.click("controlsHelpButton")
+    h.goto_page("ControlsHelpView.qml")
+    rows = ["closeHelp", "settingsHelp", "lcHelp", "espHelp", "driveModeHelp", "startStopHelp", "driftStickHelp"]
+    h.check(h.eval("[%s].map(function(r) { return r.label; })" % ", ".join(rows))
+            == ["Close", "Settings", "LC - Launch Control", "ESP Sport", "Drive Mode", "Auto Start-Stop", "Drift Stick"],
+            "explains Close, Settings, LC, ESP, Drive Mode, Auto Start-Stop and Drift Stick, in that order")
+    h.check(h.eval("[%s].every(function(r) { return r.description.length > 10; })" % ", ".join(rows)),
+            "every control has a description")
+    h.check(h.eval("helpRows.mapToItem(null, 0, helpRows.height).y <= 480 && helpRows.y >= helpTitle.y + helpTitle.height"),
+            "all rows fit on the page under the title")
+    h.shot("controls_help")
+    h.click("backButton")
+    h.goto_page("SettingsView.qml")
+    h.check(h.current_page() == "SettingsView.qml", "back arrow returns to settings")
+
+
+@scenario
 def settings_version(h):
     """The settings page footer shows the app version from version.txt."""
     version = (APP / "version.txt").read_text(encoding="utf-8").strip()
@@ -827,6 +851,9 @@ def render_readme_shots(h):
     h.wait(300)
     h.goto_settings()
     h.shot("settings", README_SHOTS)
+    h.click("controlsHelpButton")
+    h.goto_page("ControlsHelpView.qml")
+    h.shot("controls_help", README_SHOTS)
 
 
 def run_interactive(h, args):

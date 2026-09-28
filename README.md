@@ -19,8 +19,8 @@ A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by
 | ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left; PTU, oil, RDU and lambda gauges with the logo between them; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
 | **Drive mode fan** (tap the mode button) | **Drift Stick fan** (tap Drift Stick) |
 | ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Drift Stick fan: All Modes, Drift Only and Off in an arc up and to the right of the Drift Stick button, with the current choice lit](docs/screenshots/drift_stick_fan.png) |
-| **Settings** | |
-| ![Settings page: temperature, pressure and torque units, and the OBD mode](docs/screenshots/settings.png) | |
+| **Settings** | **Controls help** (settings, bottom left) |
+| ![Settings page: temperature, pressure and torque units, the OBD mode, and the Controls Help button](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, LC, ESP, drive mode, auto start-stop and Drift Stick buttons do](docs/screenshots/controls_help.png) |
 
 These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
@@ -94,6 +94,11 @@ Starting from v2.10.0, the gauges show their value with a flat cut instead of an
   - The logo between the big gauges is 80 px tall (was 50) and sits 17 px higher. The top gauges' rings are open at the bottom, so the free space between the four gauges is centred higher than the gauges themselves; the logo is now centred in that space, midway between the lower ends of the top rings and the tops of the bottom rings. It clears every ring and mark by about 14 px at the top of its pulse.
 - **Drive mode button** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/ButtonGauge.qml`)
   - The button reads **Drive** above the mode and **Mode** below it, with the mode larger, so it's balanced top to bottom. `ButtonGauge` has a new optional `topText` line for this. While a fan is open, its stand-in for the button has a solid centre, so the dimmed button's text no longer shows through behind "Close".
+
+Starting from v2.11.0, the settings page has a controls help page:
+
+- **Controls help** (`SyncMyMod/app/SettingsView.qml`, `SyncMyMod/app/ControlsHelpView.qml`, `SyncMyMod/app/Components/HelpRow.qml`)
+  - A **Controls Help** button in the bottom left of the settings page opens a page explaining each control on the main view: close, settings, LC, ESP Sport, drive mode, auto start-stop and Drift Stick. Each is shown as it looks when lit, next to what it does. The back arrow returns to settings.
 
 ## Testing on a PC
 
@@ -211,4 +216,9 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Main view: the drive mode button reads Drive / <mode> / Mode, with the mode larger (new `topText` line on `ButtonGauge`)
 - Fans: the stand-in for the button while a fan is open has a solid centre, so the button's own text no longer shows through behind "Close"
 - Harness: added a pixel check that the bar is cut flat across the ring at the value, keeps its rounded start, and draws nothing at the bottom of the scale; the logo checks now measure against each ring as drawn (its arc, thickness and marks) and require 8 px of room at full pulse; video tour and screenshots re-rendered
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.11.0JC] - 2026-09-27
+- Settings page: added a Controls Help button (bottom left) that opens a page explaining what each main view control does
+- Harness: added a controls help scenario and README screenshot; the video tour visits the help page
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
