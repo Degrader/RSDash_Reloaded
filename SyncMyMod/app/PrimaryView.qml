@@ -36,15 +36,6 @@ Rectangle {
         { gaugeId: rightRDUTqGauge,     param: "rdutqr" }
     ]
 
-    property var settingsData: [
-        { gaugeId: lcGauge,             param: "enableLC" },
-        { gaugeId: driftStickGauge,     param: "enableDriftMode" },
-        { gaugeId: espGauge,            param: "esp" },
-        { gaugeId: autoStartStopGauge,  param: "disableStartStop" },
-        { gaugeId: driveModeState,      param: "driveMode" },
-        { gaugeId: driftInState,        param: "driftInAllModes" }
-    ]
-
     Image {
         id: closeButton
         anchors.top: parent.top
@@ -133,10 +124,11 @@ Rectangle {
 
     Image {
         id: settingsButton
-        // Beside the close button; the right column runs to the top edge
-        anchors.top: closeButton.top
-        anchors.left: closeButton.right
-        anchors.leftMargin: 10
+        // Bottom left corner, below RDU's ring (the close button has the
+        // top left)
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.margins: 5
         width: 34
         fillMode: Image.PreserveAspectFit
         source: "res/settings.png"
@@ -152,8 +144,9 @@ Rectangle {
         id: ptuGauge
         anchors.top: parent.top
         anchors.topMargin: 20
-        anchors.left: buttonColumn.right
-        anchors.leftMargin: 6
+        // Centred: the four big gauges, the gap, and the right column
+        anchors.left: parent.left
+        anchors.leftMargin: (parent.width - (2 * width + 8 + 10 + sensorArea.width)) / 2
         height: size
         width: size
         size: 210
@@ -333,6 +326,7 @@ Rectangle {
     // rings and the tops of the bottom rings. The image has transparent
     // space above and below the artwork, so at 80 px tall the visible part
     // clears all four rings by about 14 px at the top of its pulse.
+    // Tapping it opens the Controls page.
     Image {
         id: nutronLogo
         height: 80
@@ -374,252 +368,14 @@ Rectangle {
             }
             property bool scaleUp: true
         }
-    }
 
-    // Controls down the left edge, under the close button. Each ring is lit
-    // while its setting is on.
-    Column {
-        id: buttonColumn
-        anchors.top: closeButton.bottom
-        anchors.topMargin: 4
-        anchors.left: parent.left
-        anchors.leftMargin: 6
-        spacing: 8
-
-        ButtonGauge {
-            id: lcGauge
-            width: size
-            height: size
-            size: 80
-            thick: 9
-
-            icon: "launchControl"
-            iconSize: 38
-
-            primaryColor: lcColour
-
-            minValue: 0
-            maxValue: 1
-
-            startAngleDegrees: 0
-            endAngleDegrees: 360
-
-            MouseArea {
-                id: lcButton
-                anchors.fill: parent
-                onClicked: {
-                    var newValue = lcGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "enableLC", newValue, lcGauge)
-                }
-            }
-        }
-
-        ButtonGauge {
-            id: espGauge
-            width: size
-            height: size
-            size: 80
-            thick: 9
-
-            icon: "espSport"
-            iconSize: 38
-
-            primaryColor: espColour
-
-            minValue: 0
-            maxValue: 1
-
-            startAngleDegrees: 0
-            endAngleDegrees: 360
-
-            MouseArea {
-                id: espButton
-                anchors.fill: parent
-                onClicked: {
-                    var newValue = espGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "esp", newValue, espGauge, function(ok) {
-                        showStartupToast(ok, newValue ? "ESP Sport on from the next start"
-                                                      : "ESP Sport off from the next start")
-                    })
-                }
-            }
-        }
-
-        // Shows the drive mode; tapping it fans the modes out to the right.
-        // In the middle of the column so the fan has the full height.
-        ButtonGauge {
-            id: driveModeGauge
-            width: size
-            height: size
-            size: 80
-            thick: 9
-
-            // The current mode's icon, with its name on a tab over the
-            // bottom of the ring
-            icon: driveModeFan.iconFor(driveModeState.currentValue)
-            iconSize: 38
-            badgeText: driveModeFan.nameFor(driveModeState.currentValue)
-            badgeSize: 10
-            badgeOffset: 30
-            currentValue: 1
-
-            primaryColor: driveModeColour
-
-            minValue: 0
-            maxValue: 1
-
-            startAngleDegrees: 0
-            endAngleDegrees: 360
-
-            MouseArea {
-                id: driveModeButton
-                anchors.fill: parent
-                onClicked: driveModeFan.open = true
-            }
-        }
-
-        ButtonGauge {
-            id: autoStartStopGauge
-            width: size
-            height: size
-            size: 80
-            thick: 9
-
-            icon: "autoStartStopOff"
-            iconSize: 38
-
-            primaryColor: startStopColour
-
-            minValue: 0
-            maxValue: 1
-
-            startAngleDegrees: 0
-            endAngleDegrees: 360
-
-            MouseArea {
-                id: autoStartStopButton
-                anchors.fill: parent
-                onClicked: {
-                    var newValue = autoStartStopGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "disableStartStop", newValue, autoStartStopGauge, function(ok) {
-                        showStartupToast(ok, newValue ? "Auto start-stop off from the next start"
-                                                      : "Auto start-stop on from the next start")
-                    })
-                }
-            }
-        }
-
-        // Lit while Drift Stick is on; the status shows where it works.
-        // Tapping it fans out Off / Drift Only / All Modes.
-        ButtonGauge {
-            id: driftStickGauge
-            width: size
-            height: size
-            size: 80
-            thick: 9
-
-            // The lever icon, with the current choice on a tab over the
-            // bottom of the ring
-            icon: "driftStick"
-            iconSize: 38
-            badgeText: driftStickFan.nameFor(driftStickChoice).replace("\n", " ")
-            badgeSize: 10
-            badgeOffset: 30
-
-            primaryColor: driftStickColour
-
-            minValue: 0
-            maxValue: 1
-
-            startAngleDegrees: 0
-            endAngleDegrees: 360
-
-            MouseArea {
-                id: driftStickButton
-                anchors.fill: parent
-                onClicked: driftStickFan.open = true
-            }
+        MouseArea {
+            id: logoButton
+            anchors.fill: parent
+            onClicked: loader.source = "ControlsView.qml"
         }
     }
 
-    // The ESP32's driveMode, shown by driveModeGauge and its fan
-    Item {
-        id: driveModeState
-        property real currentValue: 0
-    }
-
-    // Drive mode, ESP Sport and auto start-stop are startup settings: the
-    // ESP32 applies them the next time the car starts, not straight away.
-    // Changing one shows a short note saying so, or that it failed.
-    function showStartupToast(ok, message) {
-        startupToast.text = ok ? message : "Couldn't reach the ESP32 - not changed"
-        startupToast.failed = !ok
-        startupToastTimer.restart()
-    }
-
-    Rectangle {
-        id: startupToast
-        property alias text: startupToastText.text
-        property bool failed: false
-        z: 900
-        anchors.horizontalCenter: nutronLogo.horizontalCenter
-        anchors.verticalCenter: nutronLogo.verticalCenter
-        width: startupToastText.width + 28
-        height: startupToastText.height + 16
-        radius: height / 2
-        color: "black"
-        border.width: 2
-        border.color: failed ? "#ce1845" : "#329BFD"
-        opacity: startupToastTimer.running ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 200 } }
-
-        Text {
-            id: startupToastText
-            anchors.centerIn: parent
-            font.pixelSize: 17
-            font.weight: Font.Bold
-            color: "#F8E63C"
-        }
-    }
-
-    Timer {
-        id: startupToastTimer
-        interval: 3500
-    }
-
-    // The ESP32's driftInAllModes: whether Drift Stick works in every drive
-    // mode (1) or only in Drift (0)
-    Item {
-        id: driftInState
-        property real currentValue: 0
-    }
-
-    // Drift Stick as one choice: 0 off, 1 Drift mode only, 2 all modes
-    readonly property int driftStickChoice: driftStickGauge.currentValue !== 1 ? 0
-                                            : (driftInState.currentValue === 1 ? 2 : 1)
-
-    // Sends only what changes. Turning it on goes first and the mode choice
-    // follows once the ESP32 accepts, the same order as the old buttons.
-    function setDriftStick(choice) {
-        if (choice === 0) {
-            if (driftStickGauge.currentValue !== 0)
-                Controller.sendData("settings", "enableDriftMode", 0, driftStickGauge)
-            return
-        }
-        var allModes = choice === 2 ? 1 : 0
-        var setModes = function() {
-            if (driftInState.currentValue !== allModes)
-                Controller.sendData("settings", "driftInAllModes", allModes, driftInState)
-        }
-        if (driftStickGauge.currentValue !== 1) {
-            Controller.sendData("settings", "enableDriftMode", 1, driftStickGauge, function(ok) {
-                if (ok) setModes()
-            })
-        } else {
-            setModes()
-        }
-    }
     // Right column, four rows: front and rear tire pressures, RDU clutch
     // temps and RDU torque, all shown at once.
     Item {
@@ -980,64 +736,12 @@ Rectangle {
         repeat: true
         onTriggered: {
             Controller.checkNotAlone();
-            // The app may have opened before the Sync 3 joined the ESP32's
-            // Wi-Fi, and the RSapp phone app can change these too
-            Controller.fetchData("settings", settingsData);
         }
-    }
-
-    // The fans go last and above the Ready To Race popup, so each covers
-    // the whole page while open. The drive mode button is mid-column, so its
-    // fan opens straight right; Drift Stick is at the bottom, so its fan
-    // opens up and to the right.
-    RadialFan {
-        id: driveModeFan
-        anchors.fill: parent
-        accentColour: driveModeColour
-        z: 1000
-        hub: driveModeGauge
-        // driveMode values the ESP32 expects (4 isn't used)
-        options: [
-            { name: "Normal", value: 0, icon: "modeNormal" },
-            { name: "Sport",  value: 1, icon: "modeSport" },
-            { name: "Track",  value: 2, icon: "modeTrack" },
-            { name: "Drift",  value: 3, icon: "modeDrift" },
-            { name: "Custom", value: 5, icon: "modeCustom" }
-        ]
-        currentValue: driveModeState.currentValue
-        title: "Startup drive mode"
-        subtitle: "The mode the car starts in. Applies the next time the car starts; "
-                  + "while driving, use the drive mode button by the gear lever."
-        onPicked: {
-            var mode = nameFor(value)
-            Controller.sendData("settings", "driveMode", value, driveModeState, function(ok) {
-                showStartupToast(ok, "Starts in " + mode + " mode from the next start")
-            })
-        }
-    }
-
-    RadialFan {
-        id: driftStickFan
-        anchors.fill: parent
-        accentColour: driftStickColour
-        z: 1000
-        hub: driftStickGauge
-        centerDegrees: -30
-        options: [
-            { name: "All\nModes", value: 2 },
-            { name: "Drift\nOnly", value: 1 },
-            { name: "Off",         value: 0 }
-        ]
-        currentValue: driftStickChoice
-        title: "Drift Stick"
-        subtitle: "Works right away."
-        onPicked: setDriftStick(value)
     }
 
     Component.onCompleted: {
         console.log("Primary View Loaded. Fetching data due to Page Load...")
         Controller.fetchData("pids", pidsData);
-        Controller.fetchData("settings", settingsData);
         Controller.checkNotAlone();
     }
 }

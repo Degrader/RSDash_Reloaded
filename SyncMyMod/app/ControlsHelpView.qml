@@ -11,8 +11,9 @@ import QtQuick 2.6
 
 import "Components"
 
-// What each control on the main view does, opened from the settings page.
-// Each row shows the control as it looks when lit.
+// What each control does, opened from the settings page: the main view's
+// close button, settings button and logo, then each tile on the Controls
+// page, shown as it looks when lit. Descriptions follow the RSdash manual.
 Rectangle {
     id: controlsHelpViewRect
     width: 800
@@ -42,8 +43,8 @@ Rectangle {
         id: helpTitle
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 8
-        font.pixelSize: 28
+        anchors.topMargin: 6
+        font.pixelSize: 26
         font.weight: Font.Bold
         text: "Controls Help"
         color: "#329BFD"
@@ -52,7 +53,7 @@ Rectangle {
     Column {
         id: helpRows
         anchors.top: helpTitle.bottom
-        anchors.topMargin: 8
+        anchors.topMargin: 4
         anchors.left: parent.left
         anchors.leftMargin: 20
         anchors.right: parent.right
@@ -62,13 +63,13 @@ Rectangle {
         HelpRow {
             id: closeHelp
             width: parent.width
-            iconSize: 54
+            iconSize: 44
             label: "Close"
             description: "Closes RSdash."
 
             Image {
                 anchors.centerIn: parent
-                width: 34
+                width: 30
                 fillMode: Image.PreserveAspectFit
                 source: "res/close.png"
                 mipmap: true
@@ -78,13 +79,13 @@ Rectangle {
         HelpRow {
             id: settingsHelp
             width: parent.width
-            iconSize: 54
+            iconSize: 44
             label: "Settings"
             description: "Opens the settings page: units, the OBD mode, and this help."
 
             Image {
                 anchors.centerIn: parent
-                width: 34
+                width: 30
                 fillMode: Image.PreserveAspectFit
                 source: "res/settings.png"
                 mipmap: true
@@ -92,19 +93,35 @@ Rectangle {
         }
 
         HelpRow {
+            id: logoHelp
+            width: parent.width
+            iconSize: 44
+            label: "Logo - Controls"
+            description: "Tap the logo between the big gauges to open the Controls page, with the controls below."
+
+            Image {
+                anchors.centerIn: parent
+                width: 44
+                fillMode: Image.PreserveAspectFit
+                source: "res/mountuners.png"
+                mipmap: true
+            }
+        }
+
+        HelpRow {
             id: lcHelp
             width: parent.width
-            iconSize: 54
-            label: "LC - Launch Control"
-            description: "Lit when automatic Launch Control is on; tap to turn it on or off. Keep it off if your "
-                         + "engine tune already turns Launch Control on."
+            iconSize: 44
+            label: "Launch Control"
+            description: "Turns automatic Launch Control on or off, right away. Keep it off if your engine tune "
+                         + "already turns Launch Control on."
 
             ButtonGauge {
                 anchors.fill: parent
-                size: 54
-                thick: 7
+                size: 44
+                thick: 6
                 icon: "launchControl"
-                iconSize: 26
+                iconSize: 22
                 primaryColor: lcColour
                 currentValue: 1
                 minValue: 0
@@ -117,17 +134,16 @@ Rectangle {
         HelpRow {
             id: espHelp
             width: parent.width
-            iconSize: 54
+            iconSize: 44
             label: "ESP Sport (at startup)"
-            description: "Lit when the car starts with Sport traction control. Applies the next time the car starts; "
-                         + "while driving, use the car's own button."
+            description: "Whether the car starts with Sport traction control. Applies the next time the car starts."
 
             ButtonGauge {
                 anchors.fill: parent
-                size: 54
-                thick: 7
+                size: 44
+                thick: 6
                 icon: "espSport"
-                iconSize: 26
+                iconSize: 22
                 primaryColor: espColour
                 currentValue: 1
                 minValue: 0
@@ -140,17 +156,17 @@ Rectangle {
         HelpRow {
             id: driveModeHelp
             width: parent.width
-            iconSize: 54
+            iconSize: 44
             label: "Drive Mode (at startup)"
-            description: "The mode the car starts in. Tap it to fan out Normal, Sport, Track, Drift and Custom, "
-                         + "then tap one; it applies the next time the car starts. While driving, use the car's button."
+            description: "The mode the car starts in: Normal, Sport, Track, Drift or Custom. Applies the next time "
+                         + "the car starts; while driving, use the car's drive mode button."
 
             ButtonGauge {
                 anchors.fill: parent
-                size: 54
-                thick: 7
+                size: 44
+                thick: 6
                 icon: "modeSport"
-                iconSize: 26
+                iconSize: 22
                 primaryColor: driveModeColour
                 currentValue: 1
                 minValue: 0
@@ -163,17 +179,17 @@ Rectangle {
         HelpRow {
             id: startStopHelp
             width: parent.width
-            iconSize: 54
-            label: "Auto Start-Stop Off (at startup)"
-            description: "Lit when the car starts with auto start-stop turned off. Applies the next time the car "
-                         + "starts. Keep it unlit if your engine tune already turns auto start-stop off."
+            iconSize: 44
+            label: "Auto Start-Stop (at startup)"
+            description: "Whether the car starts with auto start-stop turned off. Leave it alone if your engine "
+                         + "tune already turns auto start-stop off."
 
             ButtonGauge {
                 anchors.fill: parent
-                size: 54
-                thick: 7
+                size: 44
+                thick: 6
                 icon: "autoStartStopOff"
-                iconSize: 26
+                iconSize: 22
                 primaryColor: startStopColour
                 currentValue: 1
                 minValue: 0
@@ -186,17 +202,17 @@ Rectangle {
         HelpRow {
             id: driftStickHelp
             width: parent.width
-            iconSize: 54
+            iconSize: 44
             label: "Drift Stick"
-            description: "Rear wheel lock through the ABS (a handbrake for drifting). Tap to choose Off, Drift "
-                         + "Only or All Modes; works right away. Needs the ABS module flashed with the right calibration."
+            description: "Rear wheel lock through the ABS: Off, Drift Only or All Modes, right away. Needs the ABS "
+                         + "module flashed with the right calibration."
 
             ButtonGauge {
                 anchors.fill: parent
-                size: 54
-                thick: 7
+                size: 44
+                thick: 6
                 icon: "driftStick"
-                iconSize: 26
+                iconSize: 22
                 primaryColor: driftStickColour
                 currentValue: 1
                 minValue: 0

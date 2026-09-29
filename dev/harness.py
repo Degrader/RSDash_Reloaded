@@ -260,6 +260,10 @@ class Harness:
             raise HarnessError("expected %s, still on %s" % (name, self.current_page()))
         self.wait(400)  # its first fetches
 
+    def goto_controls(self):
+        self.click("nutronLogo")
+        self.goto_page("ControlsView.qml")
+
     def goto_settings(self):
         self.click("settingsButton")
         self.goto_page("SettingsView.qml")
@@ -310,14 +314,10 @@ def gauges_alone(h):
                    " && leftRDUTqGauge.visible && rightRDUTqGauge.visible"),
             "tire pressures and RDU torque both shown")
     h.check(h.eval("[leftRDUTqGauge.currentValue, rightRDUTqGauge.currentValue]") == [120, 135], "RDU torque received")
-    h.check(h.eval("[lcGauge, espGauge, driveModeGauge, autoStartStopGauge, driftStickGauge].every(function(b, i, all) {"
-                   " var p = b.mapToItem(null, 0, 0); return b.visible && b.width >= 80"
-                   " && p.x + b.width <= ptuGauge.x && p.y >= closeButton.y + closeButton.height"
-                   " && p.y + b.height <= 480 && (i === 0 || b.y > all[i - 1].y); })"),
-            "LC, ESP, Mode, start/stop and Drift Stick stacked in that order down the left, under the close button,"
-            " clear of the gauges")
-    h.check(h.eval("Math.abs(driveModeGauge.mapToItem(null, 0, driveModeGauge.height / 2).y - 240) < 30"),
-            "drive mode button is at the middle of the screen's height")
+    h.check(h.eval("typeof lcGauge === 'undefined' && typeof driveModeGauge === 'undefined'"),
+            "no control buttons on the main view (they're on the Controls page)")
+    h.check(h.eval("Math.abs(ptuGauge.x - (800 - (sensorArea.x + sensorArea.width))) < 1"),
+            "gauges centred across the screen")
     h.check(h.eval("oilGauge.x >= ptuGauge.x + ptuGauge.width && sensorArea.x >= oilGauge.x + oilGauge.width"
                    " && sensorArea.x + sensorArea.width <= 800"),
             "big gauges and the right column fit side by side on 800 px")
@@ -359,9 +359,19 @@ def gauges_alone(h):
     h.check(clearance >= 8, "logo clears all four rings and marks by %.1f px at the top of its pulse (at least 8)" % clearance)
     h.check(h.eval("nutronLogo.height") == 80, "logo is 80 px tall")
     h.check(h.eval("pulseTimer.running && pulseTimer.repeat && nutronLogo.scale !== 1"), "logo is pulsing")
-    h.check(h.eval("settingsButton.x >= closeButton.x + closeButton.width && settingsButton.y === closeButton.y"
-                   " && settingsButton.x + settingsButton.width <= ptuGauge.x"),
-            "settings button beside the close button, left of the gauges")
+    # The gear sits in the bottom left corner: its nearest point to RDU's
+    # ring must clear the ring, including the rounded end of its arc
+    h.check(h.eval("(function() { var b = settingsButton, g = rduGauge;"
+                   "  if (b.x > 10 || b.y + b.height < 470) return false;"
+                   "  var r = g.width / 2 - g.thick, gx = g.x + g.width / 2, gy = g.y + g.height / 2, least = 1e9;"
+                   "  for (var d = g.startAngleDegrees; d <= g.endAngleDegrees; d += 0.5) {"
+                   "    var px = gx + r * Math.cos(d * Math.PI / 180), py = gy + r * Math.sin(d * Math.PI / 180);"
+                   "    var dx = Math.max(0, Math.abs(px - (b.x + b.width / 2)) - b.width / 2);"
+                   "    var dy = Math.max(0, Math.abs(py - (b.y + b.height / 2)) - b.height / 2);"
+                   "    least = Math.min(least, Math.sqrt(dx * dx + dy * dy) - g.thick / 2);"
+                   "  }"
+                   "  return least >= 8; })()"),
+            "settings button in the bottom left corner, clear of RDU's ring")
     h.check(h.eval("(function() { var rows = [[frontLeftTireGauge, frontRightTireGauge], [rearLeftTireGauge, rearRightTireGauge],"
                    " [leftRDUTempGauge, rightRDUTempGauge], [leftRDUTqGauge, rightRDUTqGauge]];"
                    " return rows.every(function(r, i) { var l = r[0].mapToItem(null, 0, 0), g = r[1].mapToItem(null, 0, 0);"
@@ -496,27 +506,11 @@ def gauge_tap_does_nothing(h):
     h.check(not h.mock.posts, "tapping the split gauge sent nothing to the ESP32")
 
 
-@scenario
-def main_page_buttons(h):
-    """LC, ESP and auto start/stop in the left column show and toggle the ESP32's settings."""
-    h.start_app(settings={"enableLC": 1, "enableDriftMode": 1, "esp": 1, "disableStartStop": 1})
-    h.check(h.eval("[lcGauge.currentValue, driftStickGauge.currentValue, espGauge.currentValue,"
-                   " autoStartStopGauge.currentValue]") == [1, 1, 1, 1],
-            "LC, Drift Stick, ESP and start/stop lit from the ESP32's settings")
-    h.shot("main_page_buttons")
-    for item, key in (("lcGauge", "enableLC"), ("espGauge", "esp"), ("autoStartStopGauge", "disableStartStop")):
-        h.click(item)
-        h.wait(300)
-        h.check(h.mock.posts[-1:] == [{key: 0}] and h.eval("%s.currentValue" % item) == 0,
-                "tapping %s turned %s off" % (item, key))
-        h.click(item)
-        h.wait(300)
-        h.check(h.mock.posts[-1:] == [{key: 1}] and h.eval("%s.currentValue" % item) == 1,
-                "and tapping again turned it back on")
-
-
-BUTTON_COLOURS = [("lcGauge", "#ff7e0d"), ("espGauge", "#0dc2ff"), ("driveModeGauge", "#0c32ff"),
-                  ("autoStartStopGauge", "#0dff5e"), ("driftStickGauge", "#0dffd7")]
+TILES = [("lcTile", "Launch Control", "launchControl", "#ff7e0d"),
+         ("espTile", "ESP Sport", "espSport", "#0dc2ff"),
+         ("driveModeTile", "Drive Mode", "modeSport", "#0c32ff"),
+         ("startStopTile", "Auto Start-Stop", "autoStartStopOff", "#0dff5e"),
+         ("driftStickTile", "Drift Stick", "driftStick", "#0dffd7")]
 
 
 def ring_colour(h, image, item):
@@ -527,255 +521,210 @@ def ring_colour(h, image, item):
 
 
 @scenario
-def button_colours(h):
-    """Each left-column button has its own ring colour when lit, and grey when off; fans light the current choice in it."""
-    h.start_app(settings={"enableLC": 1, "esp": 1, "disableStartStop": 1, "enableDriftMode": 1, "driftInAllModes": 1})
+def controls_page(h):
+    """The logo opens Controls: a grid of tiles, each lit in its own colour, with icons, names and settings."""
+    h.start_app(settings={"enableLC": 1, "esp": 1, "disableStartStop": 1, "enableDriftMode": 1,
+                          "driftInAllModes": 1, "driveMode": 1})
+    h.goto_controls()
+    h.check(h.eval("controlsTitle.text") == "Controls", "tapping the logo opens the Controls page")
+    h.check(h.wait_until("lcState.currentValue === 1 && driveModeState.currentValue === 1", 1500),
+            "settings read from the ESP32 on opening")
+    ids = ", ".join(t for t, _, _, _ in TILES)
+    h.check(h.eval("[%s].map(function(t) { return [t.label, t.icon]; })" % ids) == [[l, i] for _, l, i, _ in TILES],
+            "Launch Control, ESP Sport, Drive Mode, Auto Start-Stop, Drift Stick, with their icons")
+    h.check(h.eval("[%s].map(function(t) { return t.status; })" % ids)
+            == ["On", "On at startup", "Sport at startup", "Off at startup", "All Modes"],
+            "each shows its current setting, marking the startup ones")
+    h.check(h.eval("controlGrid.columns === 3 && [%s].every(function(t) { var p = t.mapToItem(null, 0, 0);"
+                   " return p.x >= 0 && p.x + t.width <= 800 && p.y >= controlsTitle.y + controlsTitle.height"
+                   " && p.y + t.height <= controlsNote.y; })" % ids),
+            "tiles in a 3-column grid, between the title and the note, on screen")
+    h.check(h.eval("controlGrid.height + controlsTitle.height + controlsNote.height < 480 - 20"),
+            "room left in the grid for another control")
     image = h.view.grabWindow()
-    got = [ring_colour(h, image, b) for b, _ in BUTTON_COLOURS]
-    h.check(got == [c for _, c in BUTTON_COLOURS],
-            "lit: LC orange, ESP cyan, Drive Mode blue, Auto Start-Stop green, Drift Stick aqua (got %s)" % got)
-    h.shot("button_colours_on")
-    # Each button shows its icon over a short label, the icon inside the
-    # ring's inner edge, and the icon is actually drawn (text-yellow pixels)
-    # LC, ESP and auto start-stop are icon only; drive mode and Drift Stick
-    # have their text across the middle on a dark backing
-    expected = [("lcGauge", "launchControl", ""), ("espGauge", "espSport", ""),
-                ("driveModeGauge", "modeSport", "Sport"), ("autoStartStopGauge", "autoStartStopOff", ""),
-                ("driftStickGauge", "driftStick", "All Modes")]
-    got = h.eval("[%s].map(function(b) { return [b.icon, b.badgeText, b.showStatus === 1 ? b.statusText : '',"
-                 " b.name, b.topText]; })" % ", ".join(b for b, _, _ in expected))
-    h.check(got == [[i, t, "", "", ""] for _, i, t in expected], "icons, and text only on drive mode and Drift Stick: %s" % got)
-    h.check(h.eval("[driveModeGauge, driftStickGauge].every(function(b) { var s = b.width / 2 - b.thick * 1.5;"
-                   "  return b.iconSize >= 36 && b.iconOffset === 0; })"
-                   " && [lcGauge, espGauge, autoStartStopGauge].every(function(b) { return b.iconSize >= 36 && b.iconOffset === 0; })"),
-            "every icon fills the centre of its button")
-    # The text sits on a tab over the bottom of the ring: below the icon, and
-    # inside the button's outline
-    h.check(h.eval("[driveModeGauge, driftStickGauge].every(function(b) {"
-                   "  var top = b.height / 2 + b.badgeOffset - b.badgeHeight / 2;"
-                   "  var bottom = b.height / 2 + b.badgeOffset + b.badgeHeight / 2;"
-                   "  return top >= b.height / 2 + b.iconSize / 2 - 4 && bottom <= b.height"
-                   "      && b.badgeWidth <= b.width - 2 * b.thick; })"),
-            "text tab at the bottom, below the icon and within the button, on drive mode and Drift Stick")
-    h.check(h.eval("[%s].every(function(b) {"
-                   "  var half = b.iconSize / 2, inner = b.width / 2 - b.thick * 1.5;"
-                   "  var top = Math.abs(b.iconOffset - half), bottom = Math.abs(b.iconOffset + half);"
-                   "  return Math.sqrt(half * half + Math.max(top, bottom) * Math.max(top, bottom)) <= inner + 4; })"
-                   % ", ".join(b for b, _, _ in expected)),
-            "each icon fits inside its ring")
-    for button, icon, _ in expected:
-        x, y, size = h.eval("(function(){ var b = %s; var p = b.mapToItem(null, b.width / 2 - b.iconSize / 2,"
-                            " b.height / 2 + b.iconOffset - b.iconSize / 2); return [p.x, p.y, b.iconSize]; })()" % button)
+    got = [ring_colour(h, image, t + ".button") for t, _, _, _ in TILES]
+    h.check(got == [c for _, _, _, c in TILES], "lit rings in each control's colour (got %s)" % got)
+    for tile, _, icon, _ in TILES:
+        x, y, size = h.eval("(function(){ var b = %s.button; var p = b.mapToItem(null, b.width / 2 - b.iconSize / 2,"
+                            " b.height / 2 - b.iconSize / 2); return [p.x, p.y, b.iconSize]; })()" % tile)
         yellow = sum(1 for dx in range(int(size)) for dy in range(int(size))
                      if image.pixelColor(int(x) + dx, int(y) + dy).name() == "#f8e63c")
-        # A blank or broken icon has none; the thin Drift Stick lever has ~30 at 1x
         h.check(yellow >= 20, "%s icon is drawn (%d icon-coloured pixels)" % (icon, yellow))
+    h.shot("controls_page")
 
-    h.click("driftStickGauge")
-    h.wait(300)
+    # On/off tiles: tap to flip, with a note saying what it does
+    for tile, key, on_note, off_note in (
+            ("lcTile", "enableLC", "Launch Control on", "Launch Control off"),
+            ("espTile", "esp", "ESP Sport on from the next start", "ESP Sport off from the next start"),
+            ("startStopTile", "disableStartStop", "Auto start-stop off from the next start",
+             "Auto start-stop on from the next start")):
+        h.click(tile)
+        h.check(h.wait_until("!%s.lit && toast.visible" % tile, 1000) and h.mock.posts[-1:] == [{key: 0}]
+                and h.eval("toast.text") == off_note, "tapping %s sent %s=0: %r" % (tile, key, off_note))
+        h.click(tile)
+        h.check(h.wait_until("%s.lit" % tile, 1000) and h.mock.posts[-1:] == [{key: 1}]
+                and h.eval("toast.text") == on_note, "and tapping again sent %s=1: %r" % (key, on_note))
     image = h.view.grabWindow()
-    lit = ring_colour(h, image, "driftStickFan.optionButton(0)")
-    h.check(lit == "#0dffd7", "Drift Stick fan lights its current choice (All Modes) in aqua (got %s)" % lit)
-    h.click("driftStickGauge")
-    h.wait(300)
+    h.shot("controls_toast")
 
     h.start_app(settings={"enableLC": 0, "esp": 0, "disableStartStop": 0, "enableDriftMode": 0})
+    h.goto_controls()
+    h.wait(300)
     image = h.view.grabWindow()
-    got = [ring_colour(h, image, b) for b, _ in BUTTON_COLOURS]
+    got = [ring_colour(h, image, t + ".button") for t, _, _, _ in TILES]
     h.check(got == ["#1e1e1e", "#1e1e1e", "#0c32ff", "#1e1e1e", "#1e1e1e"],
-            "off: grey rings, Drive Mode (always lit) still blue (got %s)" % got)
-    h.shot("button_colours_off")
+            "off: grey rings, Drive Mode (always set) still blue (got %s)" % got)
+
+    h.click("backButton")
+    h.goto_page("PrimaryView.qml")
+    h.check(h.current_page() == "PrimaryView.qml", "back arrow returns to the gauges")
 
 
-def check_fan_layout(h, fan, hub, count):
-    """Checks an open RadialFan's option buttons: on screen, not overlapping, clear of the column."""
-    buttons = "[%s]" % ", ".join("%s.optionButton(%d)" % (fan, i) for i in range(count))
-    h.check(h.eval("%s.every(function(b) { var p = b.mapToItem(null, 0, 0);"
-                   " return p.x >= 0 && p.y >= 0 && p.x + b.width <= 800 && p.y + b.height <= 480; })" % buttons),
-            "all %d options fit on the 800x480 screen" % count)
-    h.check(h.eval("(function(){ var items = %s.concat([%s]);"
-                   " function c(b) { return b.mapToItem(null, b.width / 2, b.height / 2); }"
-                   " for (var i = 0; i < items.length; i++) for (var j = i + 1; j < items.length; j++) {"
-                   " var a = c(items[i]), b = c(items[j]);"
-                   " if (Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) < (items[i].width + items[j].width) / 2)"
-                   " return false; } return true; })()" % (buttons, hub)),
-            "options don't overlap each other or %s" % hub)
-    h.check(h.eval("%s.every(function(b) { return b.mapToItem(null, 0, 0).x >= buttonColumn.x + buttonColumn.width; })"
-                   % buttons), "options clear the button column")
-    h.check(h.eval("(function(){ var ys = %s.map(function(b) { return b.y; });"
-                   " for (var i = 1; i < ys.length; i++) if (ys[i] <= ys[i - 1]) return false; return true; })()"
-                   % buttons), "options run top to bottom in order")
+def check_popup_layout(h, popup, count):
+    """Checks an open OptionPopup: its option buttons sit in a row inside its panel, on screen."""
+    buttons = "[%s]" % ", ".join("%s.optionButton(%d)" % (popup, i) for i in range(count))
+    h.check(h.eval("(function(){ var panel = %s.panel.mapToItem(null, 0, 0), pw = %s.panel.width, ph = %s.panel.height;"
+                   " return panel.x >= 0 && panel.y >= 0 && panel.x + pw <= 800 && panel.y + ph <= 480"
+                   " && %s.every(function(b, i, all) { var p = b.mapToItem(null, 0, 0);"
+                   "   return p.x >= panel.x && p.x + b.width <= panel.x + pw && p.y + b.height <= panel.y + ph"
+                   "     && (i === 0 || p.x >= all[i - 1].mapToItem(null, 0, 0).x + all[i - 1].width); }); })()"
+                   % (popup, popup, popup, buttons)),
+            "all %d options in a row inside the pop-up, on screen" % count)
 
 
 @scenario
-def drive_mode_fan(h):
-    """The drive mode button fans the modes out to the right; picking sends driveMode, tapping outside changes nothing."""
+def drive_mode_popup(h):
+    """Drive Mode opens a pop-up of the five modes; picking one sends driveMode; closing changes nothing."""
     h.start_app(settings={"driveMode": 2})
-    h.check(h.eval("driveModeGauge.badgeText") == "Track", "the drive mode button shows the ESP32's mode (Track)")
-    h.check(h.eval("[driveModeGauge.icon, driveModeGauge.badgeText]") == ["modeTrack", "Track"],
-            "shows the Track icon over the word Track")
-    h.check(not h.eval("driveModeFan.visible"), "fan starts closed")
+    h.goto_controls()
+    h.check(h.wait_until("driveModeTile.status === 'Track at startup' && driveModeTile.icon === 'modeTrack'", 1500),
+            "the tile shows the ESP32's mode (Track) and its icon")
+    h.check(not h.eval("driveModePopup.visible"), "pop-up starts closed")
 
-    h.click("driveModeGauge")
+    h.click("driveModeTile")
     h.wait(300)
-    h.check(h.eval("driveModeFan.visible && driveModeFan.progress === 1"), "tapping the button opens the fan")
-    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).name; })")
+    h.check(h.eval("driveModePopup.visible && driveModePopup.opacity === 1"), "tapping the tile opens the pop-up")
+    h.check(h.eval("driveModePopup.title") == "Startup drive mode"
+            and "next time the car starts" in h.eval("driveModePopup.subtitle"),
+            "headed Startup drive mode, saying when it applies")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModePopup.optionButton(i).name; })")
             == ["Normal", "Sport", "Track", "Drift", "Custom"], "Normal to Custom")
-    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).icon; })")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModePopup.optionButton(i).icon; })")
             == ["modeNormal", "modeSport", "modeTrack", "modeDrift", "modeCustom"], "each mode has its icon")
-    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).currentValue; })")
-            == [0, 0, 1, 0, 0], "only Track is lit in the fan")
-    check_fan_layout(h, "driveModeFan", "driveModeGauge", 5)
-    h.check(h.eval("(function(){ var track = driveModeFan.optionButton(2);"
-                   " return Math.abs(track.mapToItem(null, 0, track.height / 2).y"
-                   " - driveModeGauge.mapToItem(null, 0, driveModeGauge.height / 2).y) < 1; })()"),
-            "Track level with the drive mode button")
-    h.shot("drive_mode_fan")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModePopup.optionButton(i).currentValue; })")
+            == [0, 0, 1, 0, 0], "only Track is lit")
+    check_popup_layout(h, "driveModePopup", 5)
+    h.shot("drive_mode_popup")
 
     posts_before = len(h.mock.posts)
-    h.click("driveModeFan.optionButton(1)")
-    h.wait(300)
-    h.check(h.mock.posts[posts_before:] == [{"driveMode": 1}], "tapping Sport sent driveMode=1 and nothing else")
-    h.check(h.wait_until("!driveModeFan.visible", 1000), "fan closes after a pick")
-    h.check(h.eval("[driveModeGauge.icon, driveModeGauge.badgeText]") == ["modeSport", "Sport"],
-            "the button now shows the Sport icon and Sport")
+    h.click("driveModePopup.optionButton(1)")
+    h.check(h.wait_until("!driveModePopup.visible && driveModeTile.status === 'Sport at startup'", 1500),
+            "picking Sport closes the pop-up and the tile shows Sport")
+    h.check(h.mock.posts[posts_before:] == [{"driveMode": 1}], "sent driveMode=1 and nothing else")
+    h.check(h.eval("toast.text") == "Starts in Sport mode from the next start", "and says it applies from the next start")
 
     # Custom is driveMode 5 (4 isn't used)
-    h.click("driveModeGauge")
+    h.click("driveModeTile")
     h.wait(300)
-    h.click("driveModeFan.optionButton(4)")
+    h.click("driveModePopup.optionButton(4)")
     h.wait(300)
     h.check(h.mock.posts[-1:] == [{"driveMode": 5}], "tapping Custom sent driveMode=5")
 
     posts_before = len(h.mock.posts)
-    h.click("driveModeGauge")
+    h.click("driveModeTile")
     h.wait(300)
-    h.click("settingsButton")  # under the fan, so this lands on its background
+    h.click("controlsTitle")  # outside the panel, so this lands on the dimmed background
+    h.check(h.wait_until("!driveModePopup.visible", 1000), "tapping outside the panel closes the pop-up")
+    h.click("driveModeTile")
     h.wait(300)
-    h.check(h.wait_until("!driveModeFan.visible", 1000), "tapping outside the buttons closes the fan")
-    h.check(len(h.mock.posts) == posts_before and h.current_page() == "PrimaryView.qml",
-            "and neither changes the mode nor reaches the settings button underneath")
+    h.click("driveModePopup.closeButton")
+    h.check(h.wait_until("!driveModePopup.visible", 1000) and len(h.mock.posts) == posts_before,
+            "so does its close button, and neither sends anything")
 
-    h.click("driveModeGauge")
-    h.wait(300)
-    h.click("driveModeGauge")  # lands on the fan's copy of it, on top
-    h.wait(300)
-    h.check(h.wait_until("!driveModeFan.visible", 1000) and len(h.mock.posts) == posts_before,
-            "tapping the drive mode button again closes the fan without a change")
-
-    h.eval("driveModeFan.closeAfterMs = 500")
-    h.click("driveModeGauge")
-    h.check(h.wait_until("!driveModeFan.visible", 1500), "fan closes by itself if nothing is picked")
+    h.eval("driveModePopup.closeAfterMs = 500")
+    h.click("driveModeTile")
+    h.check(h.wait_until("!driveModePopup.visible", 1500), "the pop-up closes by itself if nothing is picked")
 
 
 @scenario
-def drift_stick_fan(h):
-    """Drift Stick fans out All Modes / Drift Only / Off; each pick sends only what changes."""
+def drift_stick_popup(h):
+    """Drift Stick opens a pop-up of Off / Drift Only / All Modes; each pick sends only what changes."""
     h.start_app(settings={"enableDriftMode": 0, "driftInAllModes": 0})
-    h.check(h.eval("driftStickGauge.currentValue") == 0 and h.eval("driftStickGauge.badgeText") == "Off",
-            "starts off, and the button says so")
+    h.goto_controls()
+    h.check(h.wait_until("driftStickTile.status === 'Off' && !driftStickTile.lit", 1500), "starts off, and the tile says so")
 
-    h.click("driftStickGauge")
+    h.click("driftStickTile")
     h.wait(300)
-    h.check(h.eval("driftStickFan.visible && !driveModeFan.visible"), "tapping Drift Stick opens its own fan")
-    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).name; })")
-            == ["All\nModes", "Drift\nOnly", "Off"], "All Modes, Drift Only, Off from the top")
-    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).currentValue; })") == [0, 0, 1],
+    h.check(h.eval("driftStickPopup.visible && !driveModePopup.visible"), "tapping Drift Stick opens its own pop-up")
+    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickPopup.optionButton(i).name; })")
+            == ["Off", "Drift\nOnly", "All\nModes"], "Off, Drift Only, All Modes")
+    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickPopup.optionButton(i).currentValue; })") == [1, 0, 0],
             "only Off is lit")
-    check_fan_layout(h, "driftStickFan", "driftStickGauge", 3)
-    h.shot("drift_stick_fan")
+    check_popup_layout(h, "driftStickPopup", 3)
+    image = h.view.grabWindow()
+    h.check(ring_colour(h, image, "driftStickPopup.optionButton(0)") == "#0dffd7", "lit in Drift Stick's aqua")
+    h.shot("drift_stick_popup")
 
     # Off -> All Modes: turn it on, then set all modes
     posts_before = len(h.mock.posts)
-    h.click("driftStickFan.optionButton(0)")
+    h.click("driftStickPopup.optionButton(2)")
     h.check(h.wait_until("driftStickChoice === 2", 1500), "picking All Modes turned it on in all modes")
     h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 1}, {"driftInAllModes": 1}],
             "sent enableDriftMode=1, then driftInAllModes=1")
-    h.check(h.eval("driftStickGauge.currentValue === 1 && driftStickGauge.badgeText === 'All Modes'"),
-            "button lit, status All Modes")
+    h.check(h.wait_until("driftStickTile.lit && driftStickTile.status === 'All Modes'"
+                         " && toast.text === 'Drift Stick: All Modes'", 1000), "tile lit, All Modes, and a note")
 
     # All Modes -> Drift Only: already on, so only the mode choice
     posts_before = len(h.mock.posts)
-    h.click("driftStickGauge")
+    h.click("driftStickTile")
     h.wait(300)
-    h.check(h.eval("[0, 1, 2].map(function(i) { return driftStickFan.optionButton(i).currentValue; })") == [1, 0, 0],
-            "All Modes lit when reopened")
-    h.click("driftStickFan.optionButton(1)")
+    h.click("driftStickPopup.optionButton(1)")
     h.check(h.wait_until("driftStickChoice === 1", 1500), "picking Drift Only switched to Drift mode only")
     h.check(h.mock.posts[posts_before:] == [{"driftInAllModes": 0}], "sent only driftInAllModes=0")
-    h.check(h.eval("driftStickGauge.badgeText") == "Drift Only", "shows Drift Only")
 
     # Drift Only -> Off: only the on/off switch
     posts_before = len(h.mock.posts)
-    h.click("driftStickGauge")
+    h.click("driftStickTile")
     h.wait(300)
-    h.click("driftStickFan.optionButton(2)")
+    h.click("driftStickPopup.optionButton(0)")
     h.check(h.wait_until("driftStickChoice === 0", 1500), "picking Off turned it off")
     h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 0}], "sent only enableDriftMode=0")
 
     # Picking the current choice sends nothing
     posts_before = len(h.mock.posts)
-    h.click("driftStickGauge")
+    h.click("driftStickTile")
     h.wait(300)
-    h.click("driftStickFan.optionButton(2)")
+    h.click("driftStickPopup.optionButton(0)")
     h.wait(300)
-    h.check(len(h.mock.posts) == posts_before and not h.eval("driftStickFan.visible"),
-            "picking Off again closes the fan and sends nothing")
+    h.check(len(h.mock.posts) == posts_before and not h.eval("driftStickPopup.visible"),
+            "picking Off again closes the pop-up and sends nothing")
 
     # If the ESP32 rejects turning it on, the mode choice isn't sent
     h.mock.post_status = 500
     posts_before = len(h.mock.posts)
-    h.click("driftStickGauge")
+    h.click("driftStickTile")
     h.wait(300)
-    h.click("driftStickFan.optionButton(0)")
+    h.click("driftStickPopup.optionButton(2)")
     h.wait(600)
     h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 1}] and h.eval("driftStickChoice") == 0,
             "rejected: only the switch was tried, and it still shows Off")
+    h.check(h.eval("toast.failed") and h.eval("toast.text").startswith("Couldn't reach"), "and a note says it failed")
 
 
 @scenario
-def startup_settings(h):
-    """Drive mode, ESP Sport and auto start-stop are startup settings: the app says so, and keeps up with the ESP32."""
-    h.start_app(settings={"esp": 0, "disableStartStop": 0, "driveMode": 1})
-    h.check(not h.eval("startupToast.visible"), "no note to start with")
-
-    h.click("espGauge")
-    h.check(h.wait_until("startupToast.visible && startupToast.opacity === 1", 1000), "changing ESP Sport shows a note")
-    h.check(h.eval("startupToast.text") == "ESP Sport on from the next start" and not h.eval("startupToast.failed"),
-            "saying it applies from the next start")
-    h.shot("startup_toast")
-    h.check(h.wait_until("!startupToast.visible", 5000), "and it goes away by itself")
-
-    h.click("autoStartStopGauge")
-    h.check(h.wait_until("startupToast.text === 'Auto start-stop off from the next start'", 1000),
-            "auto start-stop says the same")
-
-    h.click("driveModeGauge")
-    h.wait(300)
-    h.check(h.eval("driveModeFan.title") == "Startup drive mode" and h.eval("driveModeFan.heading.visible")
-            and "next time the car starts" in h.eval("driveModeFan.subtitle"),
-            "the drive mode fan is headed Startup drive mode, and says when it applies")
-    h.check(h.eval("driveModeFan.heading.x >= driveModeFan.optionButton(2).mapToItem(driveModeFan, 0, 0).x"
-                   " + driveModeFan.optionButton(2).width && driveModeFan.heading.x + driveModeFan.heading.width <= 800"),
-            "heading sits to the right of the fan, on screen")
-    h.shot("drive_mode_fan_heading")
-    h.click("driveModeFan.optionButton(2)")
-    h.check(h.wait_until("startupToast.text === 'Starts in Track mode from the next start'", 1000),
-            "picking Track says it starts in Track from the next start")
-
-    h.mock.post_status = 500
-    h.click("espGauge")
-    h.check(h.wait_until("startupToast.failed", 1000) and h.eval("startupToast.text").startswith("Couldn't reach"),
-            "a failed change says so")
-    h.mock.post_status = 200
-
-    # Changed elsewhere (the RSapp phone app), or the app opened before the
-    # Sync 3 joined the ESP32's Wi-Fi: the app catches up within 5 s
+def controls_sync(h):
+    """The Controls page keeps up with the ESP32 (e.g. changes from the RSapp phone app) every 5 s."""
+    h.start_app(settings={"driveMode": 1, "esp": 0, "enableLC": 0})
+    h.goto_controls()
+    h.check(h.wait_until("driveModeState.currentValue === 1", 1500), "starts on Sport")
     with h.mock.lock:
-        h.mock.settings.update({"driveMode": 3, "esp": 0, "enableLC": 1})
-    h.check(h.wait_until("driveModeState.currentValue === 3 && espGauge.currentValue === 0"
-                         " && lcGauge.currentValue === 1", 7000),
-            "settings changed on the ESP32 show up in the app within 5 s")
+        h.mock.settings.update({"driveMode": 3, "esp": 1, "enableLC": 1})
+    h.check(h.wait_until("driveModeTile.status === 'Drift at startup' && espTile.lit && lcTile.lit", 7000),
+            "settings changed on the ESP32 show up within 5 s")
+    h.mock.post_status = 500
+    h.click("espTile")
+    h.check(h.wait_until("toast.failed", 1000) and h.eval("espTile.lit"),
+            "a rejected change says so and leaves the setting as it was")
 
 
 @scenario
@@ -825,12 +774,12 @@ def controls_help(h):
             "Controls Help button in the bottom left of the settings page")
     h.click("controlsHelpButton")
     h.goto_page("ControlsHelpView.qml")
-    rows = ["closeHelp", "settingsHelp", "lcHelp", "espHelp", "driveModeHelp", "startStopHelp", "driftStickHelp"]
+    rows = ["closeHelp", "settingsHelp", "logoHelp", "lcHelp", "espHelp", "driveModeHelp", "startStopHelp",
+            "driftStickHelp"]
     h.check(h.eval("[%s].map(function(r) { return r.label; })" % ", ".join(rows))
-            == ["Close", "Settings", "LC - Launch Control", "ESP Sport (at startup)", "Drive Mode (at startup)",
-                "Auto Start-Stop Off (at startup)", "Drift Stick"],
-            "explains Close, Settings, LC, ESP, Drive Mode, Auto Start-Stop and Drift Stick, in that order,"
-            " marking the startup settings")
+            == ["Close", "Settings", "Logo - Controls", "Launch Control", "ESP Sport (at startup)",
+                "Drive Mode (at startup)", "Auto Start-Stop (at startup)", "Drift Stick"],
+            "explains Close, Settings, the logo, then each control, marking the startup settings")
     h.check(h.eval("[%s].every(function(r) { return r.description.length > 10; })" % ", ".join(rows)),
             "every control has a description")
     h.check(h.eval("helpRows.mapToItem(null, 0, helpRows.height).y <= 480 && helpRows.y >= helpTitle.y + helpTitle.height"),
@@ -969,16 +918,21 @@ def render_readme_shots(h):
     h.shot("main_view_not_alone", README_SHOTS)
 
     h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1, "esp": 1, "disableStartStop": 1, "driveMode": 2})
-    h.click("driveModeGauge")
+    h.goto_controls()
     h.wait(300)
-    h.shot("drive_mode_fan", README_SHOTS)
-    h.click("driveModeFan.optionButton(2)")
+    h.shot("controls", README_SHOTS)
+    h.click("driveModeTile")
     h.wait(300)
-    h.click("driftStickGauge")
+    h.shot("drive_mode_popup", README_SHOTS)
+    h.click("driveModePopup.closeButton")
     h.wait(300)
-    h.shot("drift_stick_fan", README_SHOTS)
-    h.click("driftStickFan.optionButton(0)")
+    h.click("driftStickTile")
     h.wait(300)
+    h.shot("drift_stick_popup", README_SHOTS)
+    h.click("driftStickPopup.closeButton")
+    h.wait(300)
+    h.click("backButton")
+    h.goto_page("PrimaryView.qml")
     h.goto_settings()
     h.shot("settings", README_SHOTS)
     h.click("controlsHelpButton")

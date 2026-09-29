@@ -8,7 +8,7 @@ All credit for the original design, the gauge layout, and the ESP32 firmware goe
 
 ## Video tour
 
-![RSdash tour: live gauges, LC / ESP / auto start-stop buttons, the drive mode and Drift Stick fans, settings, OBD Not Alone and Ready To Race](docs/tour.gif)
+![RSdash tour: live gauges, the Controls page (launch control, ESP Sport, auto start-stop, the drive mode and Drift Stick pop-ups), settings, OBD Not Alone and Ready To Race](docs/tour.gif)
 
 A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by `dev/tour.py`, against the fake ESP32 with its values drifting. To re-record it after a UI change, run `python dev/tour.py`.
 
@@ -16,9 +16,11 @@ A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by
 
 | Main view | Main view, OBD Not Alone |
 |:---:|:---:|
-| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left, each lit in its own colour; PTU, oil, RDU and lambda gauges with the logo between them; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
-| **Drive mode fan** (tap the mode button) | **Drift Stick fan** (tap Drift Stick) |
-| ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Drift Stick fan: All Modes, Drift Only and Off in an arc up and to the right of the Drift Stick button, with the current choice lit](docs/screenshots/drift_stick_fan.png) |
+| ![Main view: PTU, oil, RDU and lambda gauges with the logo between them (tap it for Controls); tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
+| **Controls** (tap the logo) | **Drive mode pop-up** (tap Drive Mode) |
+| ![Controls page: Launch Control, ESP Sport, Drive Mode, Auto Start-Stop and Drift Stick tiles in a grid, each lit in its own colour, with their settings](docs/screenshots/controls.png) | ![Drive mode pop-up: Normal, Sport, Track, Drift and Custom, with the current mode lit](docs/screenshots/drive_mode_popup.png) |
+| **Drift Stick pop-up** (tap Drift Stick) | |
+| ![Drift Stick pop-up: Off, Drift Only and All Modes, with the current choice lit](docs/screenshots/drift_stick_popup.png) | |
 | **Settings** | **Controls help** (settings, bottom left) |
 | ![Settings page: temperature, pressure and torque units, the OBD mode, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, LC, ESP, drive mode, auto start-stop and Drift Stick buttons do](docs/screenshots/controls_help.png) |
 
@@ -119,6 +121,14 @@ Starting from v2.14.0, the settings page credits Nutron:
 
 - **Settings page** (`SyncMyMod/app/SettingsView.qml`)
   - Nutron's logo and "ESP32 device and firmware by Nutron Pro Moto" sit in the bottom right, above the app's author credit. The main view's logo image is now `res/mountuners.png`, and `res/nutron.png` is Nutron's logo.
+
+Starting from v2.15.0, the controls have their own page:
+
+- **Controls page** (`SyncMyMod/app/ControlsView.qml`, `Components/ControlTile.qml`, `Components/OptionPopup.qml`)
+  - Tap the logo between the big gauges to open **Controls**: a grid of tiles for Launch Control, ESP Sport, Drive Mode, Auto Start-Stop and Drift Stick, each with its icon, its ring lit in its colour while it's on, and its current setting underneath ("Track at startup", "All Modes"). The back arrow returns to the gauges.
+  - Launch Control, ESP Sport and Auto Start-Stop switch with a tap. Drive Mode and Drift Stick open a pop-up showing all their options, the current one lit; tapping outside it or its close button leaves the setting as it was. A note at the bottom says which settings apply at the next start, and a short note after each change says what it did, or that the ESP32 couldn't be reached.
+  - The grid has three columns and a free space, so more controls can be added: each is one `ControlTile` in `controlGrid`.
+  - The main view is now just the gauges, centred across the screen, with the close button in the top left and the settings button in the bottom left. The drive mode and Drift Stick fans are gone (`RadialFan.qml` removed).
 
 ## Testing on a PC
 
@@ -265,4 +275,12 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Settings page: Nutron's logo and an "ESP32 device and firmware by Nutron Pro Moto" credit above the author credit
 - The main view's logo image is renamed `res/mountuners.png`; `res/nutron.png` is now Nutron's logo
 - Harness: checks the Nutron logo loads and sits clear of the settings
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.15.0JC] - 2026-09-28
+- New Controls page, opened by tapping the logo on the main view: Launch Control, ESP Sport, Drive Mode, Auto Start-Stop and Drift Stick as tiles in a three-column grid, with room for more
+- Drive Mode and Drift Stick open a pop-up of their options instead of fanning out; Launch Control, ESP Sport and Auto Start-Stop switch with a tap, each with a short note saying what it did
+- Main view: the button column and fans are gone and the gauges are centred; the settings button moved to the bottom left corner; removed `RadialFan.qml`
+- Controls help: explains the logo and each control on the Controls page
+- Harness: Controls page, drive mode pop-up, Drift Stick pop-up and settings sync scenarios replace the main view button and fan scenarios; README screenshots of the Controls page and its pop-ups
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
