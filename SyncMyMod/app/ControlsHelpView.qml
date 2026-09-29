@@ -96,9 +96,8 @@ Rectangle {
             width: parent.width
             iconSize: 54
             label: "LC - Launch Control"
-            description: "Lit when Launch Control is enabled; tap to turn it on or off. With it on, launch from a stop "
-                         + "with the clutch down and the throttle floored: the engine holds launch revs until you "
-                         + "release the clutch."
+            description: "Lit when automatic Launch Control is on; tap to turn it on or off. Keep it off if your "
+                         + "engine tune already turns Launch Control on."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -119,9 +118,9 @@ Rectangle {
             id: espHelp
             width: parent.width
             iconSize: 54
-            label: "ESP Sport"
-            description: "Lit when the stability control (ESP) is in Sport mode, which allows more slip before it "
-                         + "steps in. Tap to switch between Sport and normal."
+            label: "ESP Sport (at startup)"
+            description: "Lit when the car starts with Sport traction control. Applies the next time the car starts; "
+                         + "while driving, use the car's own button."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -142,9 +141,9 @@ Rectangle {
             id: driveModeHelp
             width: parent.width
             iconSize: 54
-            label: "Drive Mode"
-            description: "Shows the drive mode. Tap it to fan out Normal, Sport, Track, Drift and Custom, then tap "
-                         + "one to switch to it. Tap the button again, or anywhere else, to close without a change."
+            label: "Drive Mode (at startup)"
+            description: "The mode the car starts in. Tap it to fan out Normal, Sport, Track, Drift and Custom, "
+                         + "then tap one; it applies the next time the car starts. While driving, use the car's button."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -165,9 +164,9 @@ Rectangle {
             id: startStopHelp
             width: parent.width
             iconSize: 54
-            label: "Auto Start-Stop"
-            description: "Lit when auto start-stop is turned off, so the engine keeps running when you stop. "
-                         + "Tap to turn auto start-stop off or back on."
+            label: "Auto Start-Stop Off (at startup)"
+            description: "Lit when the car starts with auto start-stop turned off. Applies the next time the car "
+                         + "starts. Keep it unlit if your engine tune already turns auto start-stop off."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -189,8 +188,8 @@ Rectangle {
             width: parent.width
             iconSize: 54
             label: "Drift Stick"
-            description: "Lit while Drift Stick is on. Tap it to choose Off, Drift Only (works only in Drift mode) "
-                         + "or All Modes (works in every drive mode). The button shows the current choice."
+            description: "Rear wheel lock through the ABS (a handbrake for drifting). Tap to choose Off, Drift "
+                         + "Only or All Modes; works right away. Needs the ABS module flashed with the right calibration."
 
             ButtonGauge {
                 anchors.fill: parent

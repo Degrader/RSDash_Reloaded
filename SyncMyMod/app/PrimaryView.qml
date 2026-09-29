@@ -437,7 +437,10 @@ Rectangle {
                 anchors.fill: parent
                 onClicked: {
                     var newValue = espGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "esp", newValue, espGauge)
+                    Controller.sendData("settings", "esp", newValue, espGauge, function(ok) {
+                        showStartupToast(ok, newValue ? "ESP Sport on from the next start"
+                                                      : "ESP Sport off from the next start")
+                    })
                 }
             }
         }
@@ -498,7 +501,10 @@ Rectangle {
                 anchors.fill: parent
                 onClicked: {
                     var newValue = autoStartStopGauge.currentValue ? 0 : 1
-                    Controller.sendData("settings", "disableStartStop", newValue, autoStartStopGauge)
+                    Controller.sendData("settings", "disableStartStop", newValue, autoStartStopGauge, function(ok) {
+                        showStartupToast(ok, newValue ? "Auto start-stop off from the next start"
+                                                      : "Auto start-stop on from the next start")
+                    })
                 }
             }
         }
@@ -540,6 +546,46 @@ Rectangle {
     Item {
         id: driveModeState
         property real currentValue: 0
+    }
+
+    // Drive mode, ESP Sport and auto start-stop are startup settings: the
+    // ESP32 applies them the next time the car starts, not straight away.
+    // Changing one shows a short note saying so, or that it failed.
+    function showStartupToast(ok, message) {
+        startupToast.text = ok ? message : "Couldn't reach the ESP32 - not changed"
+        startupToast.failed = !ok
+        startupToastTimer.restart()
+    }
+
+    Rectangle {
+        id: startupToast
+        property alias text: startupToastText.text
+        property bool failed: false
+        z: 900
+        anchors.horizontalCenter: nutronLogo.horizontalCenter
+        anchors.verticalCenter: nutronLogo.verticalCenter
+        width: startupToastText.width + 28
+        height: startupToastText.height + 16
+        radius: height / 2
+        color: "black"
+        border.width: 2
+        border.color: failed ? "#ce1845" : "#329BFD"
+        opacity: startupToastTimer.running ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+
+        Text {
+            id: startupToastText
+            anchors.centerIn: parent
+            font.pixelSize: 17
+            font.weight: Font.Bold
+            color: "#F8E63C"
+        }
+    }
+
+    Timer {
+        id: startupToastTimer
+        interval: 3500
     }
 
     // The ESP32's driftInAllModes: whether Drift Stick works in every drive
@@ -934,6 +980,9 @@ Rectangle {
         repeat: true
         onTriggered: {
             Controller.checkNotAlone();
+            // The app may have opened before the Sync 3 joined the ESP32's
+            // Wi-Fi, and the RSapp phone app can change these too
+            Controller.fetchData("settings", settingsData);
         }
     }
 
@@ -956,7 +1005,15 @@ Rectangle {
             { name: "Custom", value: 5, icon: "modeCustom" }
         ]
         currentValue: driveModeState.currentValue
-        onPicked: Controller.sendData("settings", "driveMode", value, driveModeState)
+        title: "Startup drive mode"
+        subtitle: "The mode the car starts in. Applies the next time the car starts; "
+                  + "while driving, use the drive mode button by the gear lever."
+        onPicked: {
+            var mode = nameFor(value)
+            Controller.sendData("settings", "driveMode", value, driveModeState, function(ok) {
+                showStartupToast(ok, "Starts in " + mode + " mode from the next start")
+            })
+        }
     }
 
     RadialFan {
@@ -972,6 +1029,8 @@ Rectangle {
             { name: "Off",         value: 0 }
         ]
         currentValue: driftStickChoice
+        title: "Drift Stick"
+        subtitle: "Works right away."
         onPicked: setDriftStick(value)
     }
 

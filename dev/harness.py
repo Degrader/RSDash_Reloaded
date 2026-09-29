@@ -734,6 +734,51 @@ def drift_stick_fan(h):
 
 
 @scenario
+def startup_settings(h):
+    """Drive mode, ESP Sport and auto start-stop are startup settings: the app says so, and keeps up with the ESP32."""
+    h.start_app(settings={"esp": 0, "disableStartStop": 0, "driveMode": 1})
+    h.check(not h.eval("startupToast.visible"), "no note to start with")
+
+    h.click("espGauge")
+    h.check(h.wait_until("startupToast.visible && startupToast.opacity === 1", 1000), "changing ESP Sport shows a note")
+    h.check(h.eval("startupToast.text") == "ESP Sport on from the next start" and not h.eval("startupToast.failed"),
+            "saying it applies from the next start")
+    h.shot("startup_toast")
+    h.check(h.wait_until("!startupToast.visible", 5000), "and it goes away by itself")
+
+    h.click("autoStartStopGauge")
+    h.check(h.wait_until("startupToast.text === 'Auto start-stop off from the next start'", 1000),
+            "auto start-stop says the same")
+
+    h.click("driveModeGauge")
+    h.wait(300)
+    h.check(h.eval("driveModeFan.title") == "Startup drive mode" and h.eval("driveModeFan.heading.visible")
+            and "next time the car starts" in h.eval("driveModeFan.subtitle"),
+            "the drive mode fan is headed Startup drive mode, and says when it applies")
+    h.check(h.eval("driveModeFan.heading.x >= driveModeFan.optionButton(2).mapToItem(driveModeFan, 0, 0).x"
+                   " + driveModeFan.optionButton(2).width && driveModeFan.heading.x + driveModeFan.heading.width <= 800"),
+            "heading sits to the right of the fan, on screen")
+    h.shot("drive_mode_fan_heading")
+    h.click("driveModeFan.optionButton(2)")
+    h.check(h.wait_until("startupToast.text === 'Starts in Track mode from the next start'", 1000),
+            "picking Track says it starts in Track from the next start")
+
+    h.mock.post_status = 500
+    h.click("espGauge")
+    h.check(h.wait_until("startupToast.failed", 1000) and h.eval("startupToast.text").startswith("Couldn't reach"),
+            "a failed change says so")
+    h.mock.post_status = 200
+
+    # Changed elsewhere (the RSapp phone app), or the app opened before the
+    # Sync 3 joined the ESP32's Wi-Fi: the app catches up within 5 s
+    with h.mock.lock:
+        h.mock.settings.update({"driveMode": 3, "esp": 0, "enableLC": 1})
+    h.check(h.wait_until("driveModeState.currentValue === 3 && espGauge.currentValue === 0"
+                         " && lcGauge.currentValue === 1", 7000),
+            "settings changed on the ESP32 show up in the app within 5 s")
+
+
+@scenario
 def settings_obd_toggle(h):
     """Flip OBD on the settings page and back; the gauge page follows."""
     h.start_app()
@@ -782,8 +827,10 @@ def controls_help(h):
     h.goto_page("ControlsHelpView.qml")
     rows = ["closeHelp", "settingsHelp", "lcHelp", "espHelp", "driveModeHelp", "startStopHelp", "driftStickHelp"]
     h.check(h.eval("[%s].map(function(r) { return r.label; })" % ", ".join(rows))
-            == ["Close", "Settings", "LC - Launch Control", "ESP Sport", "Drive Mode", "Auto Start-Stop", "Drift Stick"],
-            "explains Close, Settings, LC, ESP, Drive Mode, Auto Start-Stop and Drift Stick, in that order")
+            == ["Close", "Settings", "LC - Launch Control", "ESP Sport (at startup)", "Drive Mode (at startup)",
+                "Auto Start-Stop Off (at startup)", "Drift Stick"],
+            "explains Close, Settings, LC, ESP, Drive Mode, Auto Start-Stop and Drift Stick, in that order,"
+            " marking the startup settings")
     h.check(h.eval("[%s].every(function(r) { return r.description.length > 10; })" % ", ".join(rows)),
             "every control has a description")
     h.check(h.eval("helpRows.mapToItem(null, 0, helpRows.height).y <= 480 && helpRows.y >= helpTitle.y + helpTitle.height"),

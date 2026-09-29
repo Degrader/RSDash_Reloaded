@@ -108,6 +108,13 @@ Starting from v2.12.0, each button has its own colour and icon:
   - The icons are drawn on the Sync 3's QtQuick canvas, not loaded as images. `dev/make_icons.py` converts the SVGs in `docs/icons/` into polygon data (`Components/Icons.js`), trimming redundant traced points and cropping each icon to its visible shape, and `Components/SvgIcon.qml` fills them with the even-odd rule so their holes (the gauge ticks, the car windows, the checkered squares) come out right.
   - The drive mode and Drift Stick fans light the current choice in their button's colour, and the controls help page shows each button in its colour. All five are set in one place, at the top of `Nutron.qml`.
 
+Starting from v2.13.0, the startup settings say so:
+
+- **Startup settings** (`SyncMyMod/app/PrimaryView.qml`, `Components/RadialFan.qml`, `ControlsHelpView.qml`)
+  - Drive Mode, ESP Sport and Auto Start-Stop are startup preferences, as in the original RSdash manual: the ESP32 applies them the next time the car starts, and they don't change the car while it's running (use the car's own buttons for that). The drive mode fan is now headed **Startup drive mode** with a line saying when it applies, and changing any of the three shows a short note like "ESP Sport on from the next start" (or that the ESP32 couldn't be reached). The Drift Stick fan says it works right away.
+  - The app re-reads the ESP32's settings every 5 seconds, not only when it opens, so it catches up if it was opened before the Sync 3 joined the ESP32's Wi-Fi, or if a setting was changed from the RSapp phone app.
+  - The controls help page describes each control as the RSdash manual does, marking the startup settings.
+
 ## Testing on a PC
 
 `dev/` has a harness that runs the app against a fake ESP32, clicks through it, checks for QML errors and Sync 3 compatibility problems, and takes screenshots. See [dev/README.md](dev/README.md).
@@ -239,4 +246,12 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Icons are traced SVGs in `docs/icons/`, converted by `dev/make_icons.py` (straight-line paths: M/L/H/V/Z, one or more per icon) into `Components/Icons.js` and drawn by `Components/SvgIcon.qml` on the QtQuick canvas; `ButtonGauge` has new `icon`, `iconSize`, `iconOffset`, `badgeText`, `badgeSize`, `badgeOffset` and `statusSize` settings
 - Removed `StartStopIcon.qml` (replaced by the auto start-stop icon)
 - Harness: added a pixel check of each button's ring colour, lit and off, and of the Drift Stick fan's lit choice; checks each button's icon and label, that each icon fits inside its ring and is actually drawn, and each drive mode's icon in the fan
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.13.0JC] - 2026-09-28
+- Drive mode fan: headed "Startup drive mode", saying it applies the next time the car starts (the ESP32's drive mode, ESP Sport and auto start-stop settings are startup preferences, not live controls)
+- Changing drive mode, ESP Sport or auto start-stop shows a short note that it applies from the next start, or that the ESP32 couldn't be reached
+- The app re-reads the ESP32's settings every 5 seconds instead of only when it opens, so it shows the right settings even if it opened before the Sync 3 joined the ESP32's Wi-Fi
+- Controls help: descriptions follow the RSdash manual (automatic Launch Control, startup settings, Drift Stick as ABS rear wheel lock)
+- Harness: startup settings scenario (notes, fan heading, failed change, catching up with the ESP32)
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

@@ -35,6 +35,12 @@ Item {
     property real centerDegrees: 0
     property int buttonSize: 88
 
+    // Optional heading and explanation, shown to the right of the fan while
+    // it's open, level with its middle option
+    property string title: ""
+    property string subtitle: ""
+    readonly property alias heading: fanHeading
+
     // Ring colour of the lit (current) option, e.g. the hub button's colour
     property color accentColour: "#0c32ff"
 
@@ -191,6 +197,34 @@ Item {
                     fanRoot.picked(modelData.value)
                 }
             }
+        }
+    }
+
+    Column {
+        id: fanHeading
+        visible: fanRoot.title !== ""
+        opacity: fanRoot.progress
+        x: fanRoot.hubX + fanRoot.radius + fanRoot.buttonSize / 2 + 24
+        y: fanRoot.hubY + fanRoot.radius * Math.sin(fanRoot.centerDegrees * Math.PI / 180) - height / 2
+        width: fanRoot.width - x - 20
+        spacing: 4
+
+        Text {
+            id: fanTitle
+            width: parent.width
+            font.pixelSize: 26
+            font.weight: Font.Bold
+            color: "#329BFD"  // the app's heading blue, readable on the dimmed page
+            text: fanRoot.title
+        }
+
+        Text {
+            id: fanSubtitle
+            width: parent.width
+            font.pixelSize: 17
+            color: "#FFFFFF"
+            wrapMode: Text.WordWrap
+            text: fanRoot.subtitle
         }
     }
 
