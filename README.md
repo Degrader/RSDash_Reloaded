@@ -16,7 +16,7 @@ A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by
 
 | Main view | Main view, OBD Not Alone |
 |:---:|:---:|
-| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left; PTU, oil, RDU and lambda gauges with the logo between them; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
+| ![Main view: LC, ESP, drive mode, auto start/stop and Drift Stick buttons down the left, each lit in its own colour; PTU, oil, RDU and lambda gauges with the logo between them; tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
 | **Drive mode fan** (tap the mode button) | **Drift Stick fan** (tap Drift Stick) |
 | ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Drift Stick fan: All Modes, Drift Only and Off in an arc up and to the right of the Drift Stick button, with the current choice lit](docs/screenshots/drift_stick_fan.png) |
 | **Settings** | **Controls help** (settings, bottom left) |
@@ -99,6 +99,14 @@ Starting from v2.11.0, the settings page has a controls help page:
 
 - **Controls help** (`SyncMyMod/app/SettingsView.qml`, `SyncMyMod/app/ControlsHelpView.qml`, `SyncMyMod/app/Components/HelpRow.qml`)
   - A **Controls Help** button in the bottom left of the settings page opens a page explaining each control on the main view: close, settings, LC, ESP Sport, drive mode, auto start-stop and Drift Stick. Each is shown as it looks when lit, next to what it does. The back arrow returns to settings.
+
+Starting from v2.12.0, each button has its own colour and icon:
+
+- **Button colours** (`SyncMyMod/app/Nutron.qml`, `PrimaryView.qml`, `ControlsHelpView.qml`, `Components/RadialFan.qml`)
+  - Each button down the left lights its ring in its own colour, so they're easy to tell apart at a glance: **LC** orange, **ESP** cyan, **Drive Mode** the theme blue, **Auto Start-Stop** green, **Drift Stick** aqua. Off is still grey. The colours share the theme blue's brightness and saturation; red and yellow are left out, as they mean "warning" on the gauges and are the text colour.
+  - Each button is an icon filling its centre: a tachometer with an LC monogram for **LC**, a car with skid marks for **ESP**, a crossed-out auto start-stop symbol for **Auto Start-Stop**, the current drive mode's icon for **Drive Mode**, and a handbrake lever for **Drift Stick**. Only Drive Mode and Drift Stick have text: the mode's name, or the Drift Stick choice, on a black tab over the bottom of the ring so it's readable. The drive mode fan shows each mode's icon (a car for Normal, S for Sport, a checkered flag for Track, a drifting car for Drift, C for Custom), and the controls help page uses the same icons.
+  - The icons are drawn on the Sync 3's QtQuick canvas, not loaded as images. `dev/make_icons.py` converts the SVGs in `docs/icons/` into polygon data (`Components/Icons.js`), trimming redundant traced points and cropping each icon to its visible shape, and `Components/SvgIcon.qml` fills them with the even-odd rule so their holes (the gauge ticks, the car windows, the checkered squares) come out right.
+  - The drive mode and Drift Stick fans light the current choice in their button's colour, and the controls help page shows each button in its colour. All five are set in one place, at the top of `Nutron.qml`.
 
 ## Testing on a PC
 
@@ -221,4 +229,14 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 ### [2.11.0JC] - 2026-09-27
 - Settings page: added a Controls Help button (bottom left) that opens a page explaining what each main view control does
 - Harness: added a controls help scenario and README screenshot; the video tour visits the help page
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.12.0JC] - 2026-09-28
+- Main view: each left-column button lights its ring in its own colour: LC orange, ESP cyan, Drive Mode blue, Auto Start-Stop green, Drift Stick aqua (off stays grey)
+- The fans light the current choice in their button's colour, and the controls help page matches
+- `ButtonGauge` repaints when its colour changes
+- Main view: every left-column button is an icon filling its centre; only Drive Mode (mode name) and Drift Stick (current choice) have text, on a black tab over the bottom of the ring. The drive mode fan shows each mode's icon, and the controls help page uses the same icons
+- Icons are traced SVGs in `docs/icons/`, converted by `dev/make_icons.py` (straight-line paths: M/L/H/V/Z, one or more per icon) into `Components/Icons.js` and drawn by `Components/SvgIcon.qml` on the QtQuick canvas; `ButtonGauge` has new `icon`, `iconSize`, `iconOffset`, `badgeText`, `badgeSize`, `badgeOffset` and `statusSize` settings
+- Removed `StartStopIcon.qml` (replaced by the auto start-stop icon)
+- Harness: added a pixel check of each button's ring colour, lit and off, and of the Drift Stick fan's lit choice; checks each button's icon and label, that each icon fits inside its ring and is actually drawn, and each drive mode's icon in the fan
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

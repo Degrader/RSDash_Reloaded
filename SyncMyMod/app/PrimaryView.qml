@@ -393,10 +393,10 @@ Rectangle {
             size: 80
             thick: 9
 
-            name: "LC"
-            nameSize: 21
+            icon: "launchControl"
+            iconSize: 38
 
-            primaryColor: "#0c32ff"
+            primaryColor: lcColour
 
             minValue: 0
             maxValue: 1
@@ -421,14 +421,10 @@ Rectangle {
             size: 80
             thick: 9
 
-            name: "ESP"
-            nameSize: 17
-            nameOffset: -3
-            statusText: "Sport"
-            statusOffset: 13
-            showStatus: 1
+            icon: "espSport"
+            iconSize: 38
 
-            primaryColor: "#0c32ff"
+            primaryColor: espColour
 
             minValue: 0
             maxValue: 1
@@ -455,17 +451,16 @@ Rectangle {
             size: 80
             thick: 9
 
-            // Drive / <mode> / Mode, with the mode larger
-            topText: "Drive"
-            topOffset: -16
-            name: driveModeFan.nameFor(driveModeState.currentValue)
-            nameSize: 14
-            statusText: "Mode"
-            statusOffset: 16
-            showStatus: 1
+            // The current mode's icon, with its name on a tab over the
+            // bottom of the ring
+            icon: driveModeFan.iconFor(driveModeState.currentValue)
+            iconSize: 38
+            badgeText: driveModeFan.nameFor(driveModeState.currentValue)
+            badgeSize: 10
+            badgeOffset: 30
             currentValue: 1
 
-            primaryColor: "#0c32ff"
+            primaryColor: driveModeColour
 
             minValue: 0
             maxValue: 1
@@ -487,24 +482,16 @@ Rectangle {
             size: 80
             thick: 9
 
-            statusText: "OFF"
-            statusOffset: 20
-            showStatus: 1
+            icon: "autoStartStopOff"
+            iconSize: 38
 
-            primaryColor: "#0c32ff"
+            primaryColor: startStopColour
 
             minValue: 0
             maxValue: 1
 
             startAngleDegrees: 0
             endAngleDegrees: 360
-
-            StartStopIcon {
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: -4
-                width: 34
-                height: 34
-            }
 
             MouseArea {
                 id: autoStartStopButton
@@ -525,14 +512,15 @@ Rectangle {
             size: 80
             thick: 9
 
-            name: "Drift\nStick"
-            nameSize: 14
-            nameOffset: -5
-            statusText: driftStickFan.nameFor(driftStickChoice).replace("\n", " ")
-            statusOffset: 20
-            showStatus: 1
+            // The lever icon, with the current choice on a tab over the
+            // bottom of the ring
+            icon: "driftStick"
+            iconSize: 38
+            badgeText: driftStickFan.nameFor(driftStickChoice).replace("\n", " ")
+            badgeSize: 10
+            badgeOffset: 30
 
-            primaryColor: "#0c32ff"
+            primaryColor: driftStickColour
 
             minValue: 0
             maxValue: 1
@@ -956,15 +944,16 @@ Rectangle {
     RadialFan {
         id: driveModeFan
         anchors.fill: parent
+        accentColour: driveModeColour
         z: 1000
         hub: driveModeGauge
         // driveMode values the ESP32 expects (4 isn't used)
         options: [
-            { name: "Normal", value: 0 },
-            { name: "Sport",  value: 1 },
-            { name: "Track",  value: 2 },
-            { name: "Drift",  value: 3 },
-            { name: "Custom", value: 5 }
+            { name: "Normal", value: 0, icon: "modeNormal" },
+            { name: "Sport",  value: 1, icon: "modeSport" },
+            { name: "Track",  value: 2, icon: "modeTrack" },
+            { name: "Drift",  value: 3, icon: "modeDrift" },
+            { name: "Custom", value: 5, icon: "modeCustom" }
         ]
         currentValue: driveModeState.currentValue
         onPicked: Controller.sendData("settings", "driveMode", value, driveModeState)
@@ -973,6 +962,7 @@ Rectangle {
     RadialFan {
         id: driftStickFan
         anchors.fill: parent
+        accentColour: driftStickColour
         z: 1000
         hub: driftStickGauge
         centerDegrees: -30

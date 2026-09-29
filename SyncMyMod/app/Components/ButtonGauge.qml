@@ -30,11 +30,27 @@ Rectangle {
     // two-line name or an icon above the status.
     property int nameOffset: 0
     property int statusOffset: 15
+    property int statusSize: 10
 
     // Optional small line above the name, in the same size as the status
     // (e.g. "Drive" over the drive mode's name, with "Mode" under it)
     property string topText: ""
     property int topOffset: -15
+
+    // Optional icon (a name from Icons.js), drawn in the text colour. With
+    // an icon, the status line usually carries the button's label below it.
+    property string icon: ""
+    property int iconSize: 30
+    property int iconOffset: 0
+
+    // Optional label on a solid black rounded backing, so it stays
+    // readable over the icon or the ring (e.g. the drive mode's name).
+    // badgeOffset moves it down from the centre; can be two lines.
+    property string badgeText: ""
+    property int badgeSize: 11
+    property int badgeOffset: 0
+    readonly property alias badgeWidth: badge.width
+    readonly property alias badgeHeight: badge.height
 
     property real minValue
     property real maxValue
@@ -48,6 +64,7 @@ Rectangle {
     // "dummy" gauges, which now never have to paint at all).
     onCurrentValueChanged: if (visible) buttonGaugeCanvas.requestPaint()
     onVisibleChanged: if (visible) buttonGaugeCanvas.requestPaint()
+    onColourChanged: if (visible) buttonGaugeCanvas.requestPaint()
     Component.onCompleted: buttonGaugeCanvas.requestPaint()
 
     Item  {
@@ -97,6 +114,16 @@ Rectangle {
             color: "#F8E63C"
         }
 
+        SvgIcon {
+            id: gaugeIcon
+            anchors.centerIn: buttonGaugeCanvas
+            anchors.verticalCenterOffset: iconOffset
+            width: iconSize
+            height: iconSize
+            icon: buttonGaugeRect.icon
+            color: "#F8E63C"
+        }
+
         Text {
             id: gaugeTopText
             anchors.centerIn: buttonGaugeCanvas
@@ -113,12 +140,34 @@ Rectangle {
             id: gaugeStatusText
             anchors.centerIn: buttonGaugeCanvas
             anchors.verticalCenterOffset: statusOffset
-            font.pixelSize: 10
+            font.pixelSize: statusSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
             visible: showStatus == 1 ? true : false
             text: statusText
             color: "#F8E63C"
+        }
+
+        Rectangle {
+            id: badge
+            anchors.centerIn: buttonGaugeCanvas
+            anchors.verticalCenterOffset: badgeOffset
+            visible: badgeText !== ""
+            width: badgeLabel.width + 8
+            height: badgeLabel.height + 2
+            radius: height / 2
+            color: "black"
+
+            Text {
+                id: badgeLabel
+                anchors.centerIn: parent
+                font.pixelSize: badgeSize
+                font.weight: Font.Bold
+                horizontalAlignment: Text.AlignHCenter
+                lineHeight: 0.9
+                text: badgeText
+                color: "#F8E63C"
+            }
         }
     }
 }

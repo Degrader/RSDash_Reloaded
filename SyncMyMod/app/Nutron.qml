@@ -34,6 +34,17 @@ Rectangle {
 
     property bool rtrDisplayed: false
 
+    // Ring colour of each main view button when it's lit (off is grey), so
+    // each is easy to tell apart at a glance. Same brightness and saturation
+    // as the theme blue; red and yellow are left out, as they mean "warning"
+    // on the gauges and are the text colour. Also used by the fans and the
+    // controls help page.
+    readonly property color lcColour: "#FF7E0D"          // orange
+    readonly property color espColour: "#0DC2FF"         // cyan
+    readonly property color driveModeColour: "#0C32FF"   // theme blue
+    readonly property color startStopColour: "#0DFF5E"   // green
+    readonly property color driftStickColour: "#0DFFD7"  // aqua
+
     Component.onCompleted: {
         backMouseArea.enabled = false
         Controller.loadSettings();

@@ -104,9 +104,9 @@ Rectangle {
                 anchors.fill: parent
                 size: 54
                 thick: 7
-                name: "LC"
-                nameSize: 16
-                primaryColor: "#0c32ff"
+                icon: "launchControl"
+                iconSize: 26
+                primaryColor: lcColour
                 currentValue: 1
                 minValue: 0
                 maxValue: 1
@@ -127,13 +127,9 @@ Rectangle {
                 anchors.fill: parent
                 size: 54
                 thick: 7
-                name: "ESP"
-                nameSize: 13
-                nameOffset: -3
-                statusText: "Sport"
-                statusOffset: 10
-                showStatus: 1
-                primaryColor: "#0c32ff"
+                icon: "espSport"
+                iconSize: 26
+                primaryColor: espColour
                 currentValue: 1
                 minValue: 0
                 maxValue: 1
@@ -154,14 +150,9 @@ Rectangle {
                 anchors.fill: parent
                 size: 54
                 thick: 7
-                topText: "Drive"
-                topOffset: -11
-                name: "Sport"
-                nameSize: 11
-                statusText: "Mode"
-                statusOffset: 11
-                showStatus: 1
-                primaryColor: "#0c32ff"
+                icon: "modeSport"
+                iconSize: 26
+                primaryColor: driveModeColour
                 currentValue: 1
                 minValue: 0
                 maxValue: 1
@@ -182,22 +173,14 @@ Rectangle {
                 anchors.fill: parent
                 size: 54
                 thick: 7
-                statusText: "OFF"
-                statusOffset: 14
-                showStatus: 1
-                primaryColor: "#0c32ff"
+                icon: "autoStartStopOff"
+                iconSize: 26
+                primaryColor: startStopColour
                 currentValue: 1
                 minValue: 0
                 maxValue: 1
                 startAngleDegrees: 0
                 endAngleDegrees: 360
-
-                StartStopIcon {
-                    anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -3
-                    width: 24
-                    height: 24
-                }
             }
         }
 
@@ -213,9 +196,9 @@ Rectangle {
                 anchors.fill: parent
                 size: 54
                 thick: 7
-                name: "Drift\nStick"
-                nameSize: 11
-                primaryColor: "#0c32ff"
+                icon: "driftStick"
+                iconSize: 26
+                primaryColor: driftStickColour
                 currentValue: 1
                 minValue: 0
                 maxValue: 1

@@ -35,7 +35,11 @@ Item {
     property real centerDegrees: 0
     property int buttonSize: 88
 
-    // [{ name, value }], first at the top of the arc
+    // Ring colour of the lit (current) option, e.g. the hub button's colour
+    property color accentColour: "#0c32ff"
+
+    // [{ name, value, icon (optional, from Icons.js) }], first at the top
+    // of the arc
     property var options: []
 
     signal picked(int value)
@@ -45,6 +49,13 @@ Item {
             if (options[i].value === value) return options[i].name;
         }
         return "?";
+    }
+
+    function iconFor(value) {
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].value === value) return options[i].icon ? options[i].icon : "";
+        }
+        return "";
     }
 
     // The option button at index i, e.g. for the dev harness to tap
@@ -101,10 +112,13 @@ Item {
         nameSize: fanRoot.hub ? fanRoot.hub.nameSize : 0
         nameOffset: fanRoot.hub ? fanRoot.hub.nameOffset : 0
         topText: fanRoot.hub ? fanRoot.hub.topText : ""
+        icon: fanRoot.hub ? fanRoot.hub.icon : ""
+        iconSize: fanRoot.hub ? fanRoot.hub.iconSize : 30
+        iconOffset: fanRoot.hub ? fanRoot.hub.iconOffset : 0
         topOffset: fanRoot.hub ? fanRoot.hub.topOffset : 0
-        statusOffset: fanRoot.hub ? fanRoot.hub.statusOffset : 15
-        statusText: "Close"
-        showStatus: 1
+        badgeText: "Close"
+        badgeSize: fanRoot.hub ? fanRoot.hub.badgeSize : 11
+        badgeOffset: fanRoot.hub ? fanRoot.hub.badgeOffset : 0
         primaryColor: "#329BFD"
         currentValue: 1
 
@@ -139,9 +153,15 @@ Item {
             height: size
             opacity: fanRoot.progress
 
+            // With an icon, the name goes small underneath it
+            readonly property bool hasIcon: modelData.icon ? true : false
+            icon: hasIcon ? modelData.icon : ""
+            iconSize: 38
+            iconOffset: -6
             name: modelData.name
-            primaryColor: "#0c32ff"
-            nameSize: 17
+            nameSize: hasIcon ? 12 : 17
+            nameOffset: hasIcon ? 22 : 0
+            primaryColor: fanRoot.accentColour
 
             size: fanRoot.buttonSize
             thick: 10

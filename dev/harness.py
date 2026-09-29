@@ -515,6 +515,78 @@ def main_page_buttons(h):
                 "and tapping again turned it back on")
 
 
+BUTTON_COLOURS = [("lcGauge", "#ff7e0d"), ("espGauge", "#0dc2ff"), ("driveModeGauge", "#0c32ff"),
+                  ("autoStartStopGauge", "#0dff5e"), ("driftStickGauge", "#0dffd7")]
+
+
+def ring_colour(h, image, item):
+    """Screen colour in the middle of a ButtonGauge's ring, at its right-hand side."""
+    x, y = h.eval("(function(){ var b = %s; var p = b.mapToItem(null, b.width - b.thick, b.height / 2);"
+                  " return [p.x, p.y]; })()" % item)
+    return image.pixelColor(int(round(x)), int(round(y))).name()
+
+
+@scenario
+def button_colours(h):
+    """Each left-column button has its own ring colour when lit, and grey when off; fans light the current choice in it."""
+    h.start_app(settings={"enableLC": 1, "esp": 1, "disableStartStop": 1, "enableDriftMode": 1, "driftInAllModes": 1})
+    image = h.view.grabWindow()
+    got = [ring_colour(h, image, b) for b, _ in BUTTON_COLOURS]
+    h.check(got == [c for _, c in BUTTON_COLOURS],
+            "lit: LC orange, ESP cyan, Drive Mode blue, Auto Start-Stop green, Drift Stick aqua (got %s)" % got)
+    h.shot("button_colours_on")
+    # Each button shows its icon over a short label, the icon inside the
+    # ring's inner edge, and the icon is actually drawn (text-yellow pixels)
+    # LC, ESP and auto start-stop are icon only; drive mode and Drift Stick
+    # have their text across the middle on a dark backing
+    expected = [("lcGauge", "launchControl", ""), ("espGauge", "espSport", ""),
+                ("driveModeGauge", "modeSport", "Sport"), ("autoStartStopGauge", "autoStartStopOff", ""),
+                ("driftStickGauge", "driftStick", "All Modes")]
+    got = h.eval("[%s].map(function(b) { return [b.icon, b.badgeText, b.showStatus === 1 ? b.statusText : '',"
+                 " b.name, b.topText]; })" % ", ".join(b for b, _, _ in expected))
+    h.check(got == [[i, t, "", "", ""] for _, i, t in expected], "icons, and text only on drive mode and Drift Stick: %s" % got)
+    h.check(h.eval("[driveModeGauge, driftStickGauge].every(function(b) { var s = b.width / 2 - b.thick * 1.5;"
+                   "  return b.iconSize >= 36 && b.iconOffset === 0; })"
+                   " && [lcGauge, espGauge, autoStartStopGauge].every(function(b) { return b.iconSize >= 36 && b.iconOffset === 0; })"),
+            "every icon fills the centre of its button")
+    # The text sits on a tab over the bottom of the ring: below the icon, and
+    # inside the button's outline
+    h.check(h.eval("[driveModeGauge, driftStickGauge].every(function(b) {"
+                   "  var top = b.height / 2 + b.badgeOffset - b.badgeHeight / 2;"
+                   "  var bottom = b.height / 2 + b.badgeOffset + b.badgeHeight / 2;"
+                   "  return top >= b.height / 2 + b.iconSize / 2 - 4 && bottom <= b.height"
+                   "      && b.badgeWidth <= b.width - 2 * b.thick; })"),
+            "text tab at the bottom, below the icon and within the button, on drive mode and Drift Stick")
+    h.check(h.eval("[%s].every(function(b) {"
+                   "  var half = b.iconSize / 2, inner = b.width / 2 - b.thick * 1.5;"
+                   "  var top = Math.abs(b.iconOffset - half), bottom = Math.abs(b.iconOffset + half);"
+                   "  return Math.sqrt(half * half + Math.max(top, bottom) * Math.max(top, bottom)) <= inner + 4; })"
+                   % ", ".join(b for b, _, _ in expected)),
+            "each icon fits inside its ring")
+    for button, icon, _ in expected:
+        x, y, size = h.eval("(function(){ var b = %s; var p = b.mapToItem(null, b.width / 2 - b.iconSize / 2,"
+                            " b.height / 2 + b.iconOffset - b.iconSize / 2); return [p.x, p.y, b.iconSize]; })()" % button)
+        yellow = sum(1 for dx in range(int(size)) for dy in range(int(size))
+                     if image.pixelColor(int(x) + dx, int(y) + dy).name() == "#f8e63c")
+        # A blank or broken icon has none; the thin Drift Stick lever has ~30 at 1x
+        h.check(yellow >= 20, "%s icon is drawn (%d icon-coloured pixels)" % (icon, yellow))
+
+    h.click("driftStickGauge")
+    h.wait(300)
+    image = h.view.grabWindow()
+    lit = ring_colour(h, image, "driftStickFan.optionButton(0)")
+    h.check(lit == "#0dffd7", "Drift Stick fan lights its current choice (All Modes) in aqua (got %s)" % lit)
+    h.click("driftStickGauge")
+    h.wait(300)
+
+    h.start_app(settings={"enableLC": 0, "esp": 0, "disableStartStop": 0, "enableDriftMode": 0})
+    image = h.view.grabWindow()
+    got = [ring_colour(h, image, b) for b, _ in BUTTON_COLOURS]
+    h.check(got == ["#1e1e1e", "#1e1e1e", "#0c32ff", "#1e1e1e", "#1e1e1e"],
+            "off: grey rings, Drive Mode (always lit) still blue (got %s)" % got)
+    h.shot("button_colours_off")
+
+
 def check_fan_layout(h, fan, hub, count):
     """Checks an open RadialFan's option buttons: on screen, not overlapping, clear of the column."""
     buttons = "[%s]" % ", ".join("%s.optionButton(%d)" % (fan, i) for i in range(count))
@@ -539,10 +611,9 @@ def check_fan_layout(h, fan, hub, count):
 def drive_mode_fan(h):
     """The drive mode button fans the modes out to the right; picking sends driveMode, tapping outside changes nothing."""
     h.start_app(settings={"driveMode": 2})
-    h.check(h.eval("driveModeGauge.name") == "Track", "the drive mode button shows the ESP32's mode (Track)")
-    h.check(h.eval("[driveModeGauge.topText, driveModeGauge.name, driveModeGauge.statusText]") == ["Drive", "Track", "Mode"]
-            and h.eval("driveModeGauge.nameSize > 10 && driveModeGauge.topOffset === -driveModeGauge.statusOffset"),
-            "reads Drive / Track / Mode, the mode larger, with Drive and Mode evenly above and below it")
+    h.check(h.eval("driveModeGauge.badgeText") == "Track", "the drive mode button shows the ESP32's mode (Track)")
+    h.check(h.eval("[driveModeGauge.icon, driveModeGauge.badgeText]") == ["modeTrack", "Track"],
+            "shows the Track icon over the word Track")
     h.check(not h.eval("driveModeFan.visible"), "fan starts closed")
 
     h.click("driveModeGauge")
@@ -550,6 +621,8 @@ def drive_mode_fan(h):
     h.check(h.eval("driveModeFan.visible && driveModeFan.progress === 1"), "tapping the button opens the fan")
     h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).name; })")
             == ["Normal", "Sport", "Track", "Drift", "Custom"], "Normal to Custom")
+    h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).icon; })")
+            == ["modeNormal", "modeSport", "modeTrack", "modeDrift", "modeCustom"], "each mode has its icon")
     h.check(h.eval("[0, 1, 2, 3, 4].map(function(i) { return driveModeFan.optionButton(i).currentValue; })")
             == [0, 0, 1, 0, 0], "only Track is lit in the fan")
     check_fan_layout(h, "driveModeFan", "driveModeGauge", 5)
@@ -564,7 +637,8 @@ def drive_mode_fan(h):
     h.wait(300)
     h.check(h.mock.posts[posts_before:] == [{"driveMode": 1}], "tapping Sport sent driveMode=1 and nothing else")
     h.check(h.wait_until("!driveModeFan.visible", 1000), "fan closes after a pick")
-    h.check(h.eval("driveModeGauge.name") == "Sport", "the button now shows Sport")
+    h.check(h.eval("[driveModeGauge.icon, driveModeGauge.badgeText]") == ["modeSport", "Sport"],
+            "the button now shows the Sport icon and Sport")
 
     # Custom is driveMode 5 (4 isn't used)
     h.click("driveModeGauge")
@@ -598,7 +672,7 @@ def drive_mode_fan(h):
 def drift_stick_fan(h):
     """Drift Stick fans out All Modes / Drift Only / Off; each pick sends only what changes."""
     h.start_app(settings={"enableDriftMode": 0, "driftInAllModes": 0})
-    h.check(h.eval("driftStickGauge.currentValue") == 0 and h.eval("driftStickGauge.statusText") == "Off",
+    h.check(h.eval("driftStickGauge.currentValue") == 0 and h.eval("driftStickGauge.badgeText") == "Off",
             "starts off, and the button says so")
 
     h.click("driftStickGauge")
@@ -617,7 +691,7 @@ def drift_stick_fan(h):
     h.check(h.wait_until("driftStickChoice === 2", 1500), "picking All Modes turned it on in all modes")
     h.check(h.mock.posts[posts_before:] == [{"enableDriftMode": 1}, {"driftInAllModes": 1}],
             "sent enableDriftMode=1, then driftInAllModes=1")
-    h.check(h.eval("driftStickGauge.currentValue === 1 && driftStickGauge.statusText === 'All Modes'"),
+    h.check(h.eval("driftStickGauge.currentValue === 1 && driftStickGauge.badgeText === 'All Modes'"),
             "button lit, status All Modes")
 
     # All Modes -> Drift Only: already on, so only the mode choice
@@ -629,7 +703,7 @@ def drift_stick_fan(h):
     h.click("driftStickFan.optionButton(1)")
     h.check(h.wait_until("driftStickChoice === 1", 1500), "picking Drift Only switched to Drift mode only")
     h.check(h.mock.posts[posts_before:] == [{"driftInAllModes": 0}], "sent only driftInAllModes=0")
-    h.check(h.eval("driftStickGauge.statusText") == "Drift Only", "status Drift Only")
+    h.check(h.eval("driftStickGauge.badgeText") == "Drift Only", "shows Drift Only")
 
     # Drift Only -> Off: only the on/off switch
     posts_before = len(h.mock.posts)

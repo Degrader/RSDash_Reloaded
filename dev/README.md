@@ -56,6 +56,7 @@ Anything the app sends to the ESP32 is printed in the terminal.
 ## Files
 
 - `harness.py` - the runner and the scenarios. Add a new scenario by writing a function decorated with `@scenario`; `h.click("someId")`, `h.eval("js expression")`, `h.check(...)` and `h.shot("name")` cover most needs.
+- `make_icons.py` - converts the button icons in `docs/icons/` (traced SVGs made of straight lines) into `SyncMyMod/app/Components/Icons.js`, which the app draws on its canvas. Run `python dev/make_icons.py` after changing an icon; it lists which SVG each app icon comes from.
 - `tour.py` - records the video tour. The steps are in `run_tour()`; `tap()` and `say()` tap a control and set the caption.
 - `mock_esp32.py` - the fake ESP32. It serves `/pids` and `/settings` with the same JSON keys as the RSapp 2.8.1 firmware, and can be made slow, offline, or reject changes. It also runs on its own: `python dev/mock_esp32.py`.
 - `Host.qml` - stands in for the Sync 3 Custom Apps Loader, which provides `backMouseArea` and `back()` to the app.
