@@ -201,6 +201,32 @@ Rectangle {
         }
     }
 
+    // Credit for the ESP32 device and its firmware, above the app's own
+    // credit line in the bottom right
+    Text {
+        id: nutronCredit
+        anchors.right: copyright.right
+        anchors.bottom: copyright.top
+        anchors.bottomMargin: 8
+        font.pixelSize: 13
+        font.weight: Font.Bold
+        horizontalAlignment: Text.AlignRight
+        text: "ESP32 device and firmware by Nutron Pro Moto"
+        color: "#FFFFFF"
+    }
+
+    Image {
+        id: nutronLogo
+        anchors.right: copyright.right
+        anchors.bottom: nutronCredit.top
+        anchors.bottomMargin: 4
+        height: 34
+        fillMode: Image.PreserveAspectFit
+        source: "res/nutron.png"
+        smooth: true
+        mipmap: true
+    }
+
     Text {
         id: copyright
         anchors.bottom: parent.bottom

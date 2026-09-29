@@ -337,7 +337,7 @@ def gauges_alone(h):
     # The visible part of the logo at its 1.1x pulse vs each ring as drawn:
     # its arc, the ring's thickness, and the 3 px the threshold marks stick
     # out past it. The logo scales about its centre.
-    left, top, right, bottom = opaque_bounds(APP / "res" / "nutron.png")
+    left, top, right, bottom = opaque_bounds(APP / "res" / "mountuners.png")
     clearance = h.eval("(function() {"
                        "  var s = 1.1, iw = nutronLogo.sourceSize.width, ih = nutronLogo.sourceSize.height;"
                        "  var k = nutronLogo.paintedHeight / ih;"
@@ -849,6 +849,15 @@ def settings_version(h):
     h.goto_settings()
     h.wait(300)
     h.check(h.eval("copyright.text").startswith("RSdash %sJC" % version), "footer says RSdash %sJC" % version)
+    # Nutron (the ESP32 device and firmware) credited with its logo, above
+    # the app's own credit line, clear of the settings toggles
+    h.check(h.eval("nutronLogo.status === Image.Ready && nutronLogo.paintedWidth > 0"
+                   " && nutronCredit.text.indexOf('Nutron') >= 0"), "Nutron logo loaded, with its credit line")
+    h.check(h.eval("nutronLogo.y + nutronLogo.height <= nutronCredit.y && nutronCredit.y + nutronCredit.height <= copyright.y"
+                   " && nutronLogo.y >= obdToggle.mapToItem(null, 0, obdToggle.height).y + 10"
+                   " && nutronLogo.x + nutronLogo.width <= 800 && nutronLogo.x >= controlsHelpButton.x + controlsHelpButton.width"),
+            "logo and credit sit above the author line, below the toggles, clear of Controls Help")
+    h.shot("settings_credits")
 
 
 @scenario

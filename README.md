@@ -20,7 +20,7 @@ A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by
 | **Drive mode fan** (tap the mode button) | **Drift Stick fan** (tap Drift Stick) |
 | ![Drive mode fan: Normal, Sport, Track, Drift and Custom in an arc to the right of the mode button, with the current mode lit](docs/screenshots/drive_mode_fan.png) | ![Drift Stick fan: All Modes, Drift Only and Off in an arc up and to the right of the Drift Stick button, with the current choice lit](docs/screenshots/drift_stick_fan.png) |
 | **Settings** | **Controls help** (settings, bottom left) |
-| ![Settings page: temperature, pressure and torque units, the OBD mode, and the Controls Help button](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, LC, ESP, drive mode, auto start-stop and Drift Stick buttons do](docs/screenshots/controls_help.png) |
+| ![Settings page: temperature, pressure and torque units, the OBD mode, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, LC, ESP, drive mode, auto start-stop and Drift Stick buttons do](docs/screenshots/controls_help.png) |
 
 These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
@@ -114,6 +114,11 @@ Starting from v2.13.0, the startup settings say so:
   - Drive Mode, ESP Sport and Auto Start-Stop are startup preferences, as in the original RSdash manual: the ESP32 applies them the next time the car starts, and they don't change the car while it's running (use the car's own buttons for that). The drive mode fan is now headed **Startup drive mode** with a line saying when it applies, and changing any of the three shows a short note like "ESP Sport on from the next start" (or that the ESP32 couldn't be reached). The Drift Stick fan says it works right away.
   - The app re-reads the ESP32's settings every 5 seconds, not only when it opens, so it catches up if it was opened before the Sync 3 joined the ESP32's Wi-Fi, or if a setting was changed from the RSapp phone app.
   - The controls help page describes each control as the RSdash manual does, marking the startup settings.
+
+Starting from v2.14.0, the settings page credits Nutron:
+
+- **Settings page** (`SyncMyMod/app/SettingsView.qml`)
+  - Nutron's logo and "ESP32 device and firmware by Nutron Pro Moto" sit in the bottom right, above the app's author credit. The main view's logo image is now `res/mountuners.png`, and `res/nutron.png` is Nutron's logo.
 
 ## Testing on a PC
 
@@ -254,4 +259,10 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - The app re-reads the ESP32's settings every 5 seconds instead of only when it opens, so it shows the right settings even if it opened before the Sync 3 joined the ESP32's Wi-Fi
 - Controls help: descriptions follow the RSdash manual (automatic Launch Control, startup settings, Drift Stick as ABS rear wheel lock)
 - Harness: startup settings scenario (notes, fan heading, failed change, catching up with the ESP32)
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.14.0JC] - 2026-09-28
+- Settings page: Nutron's logo and an "ESP32 device and firmware by Nutron Pro Moto" credit above the author credit
+- The main view's logo image is renamed `res/mountuners.png`; `res/nutron.png` is now Nutron's logo
+- Harness: checks the Nutron logo loads and sits clear of the settings
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

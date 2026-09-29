@@ -347,7 +347,7 @@ Rectangle {
         x: (ptuGauge.x + oilGauge.x + oilGauge.width) / 2 - width / 2
         y: (topRingsBottom + bottomRingsTop) / 2 - height / 2
         fillMode: Image.PreserveAspectFit
-        source: "res/nutron.png"
+        source: "res/mountuners.png"
         smooth: true
         mipmap: true
 
