@@ -347,8 +347,13 @@ def engine_page(h):
             "no speed, lambda, torque split or control buttons on this page")
     check_chrome(h)
     h.check(boxes_clear(h, ["boostGauge", "gearArea", "gForceGauge", "gReadouts", "coolantGauge", "oilGauge", "iatGauge",
-                            "ptuGauge", "rduGauge", "driverBars"]),
+                            "ptuGauge", "rduGauge", "driverBars", "batteryArea", "clockArea"]),
             "every gauge is on the screen and none overlap")
+    h.check(h.eval("batteryText.text") == "13.8 V" and h.eval("driverBars.x + driverBars.width <= batteryArea.x"
+                   " && batteryArea.x + batteryArea.width <= clockArea.x"
+                   " && Math.abs(batteryArea.y - clockArea.y) < 1 && batteryText.paintedWidth <= batteryArea.width"),
+            "the battery voltage (13.8 V) sits between the bars and the clock")
+    h.check(h.eval("String(batteryText.color)") == "#ffffff", "white when charging normally")
     h.check(h.eval("(function() { var row = [coolantGauge, oilGauge, iatGauge, ptuGauge, rduGauge];"
                    " return row.every(function(g, i) { return g.y === row[0].y && g.width === row[0].width"
                    " && (i === 0 || (g.x > row[i - 1].x + row[i - 1].width && g.x - row[i - 1].x === row[1].x - row[0].x)); })"
@@ -381,6 +386,20 @@ def engine_page(h):
     h.check(h.eval("timeText.paintedWidth <= clockArea.width && dateText.paintedWidth <= clockArea.width"), "and they fit")
     h.eval("primaryViewRect.now = new Date()")
     h.shot("engine_page")
+
+
+@scenario
+def battery_voltage(h):
+    """Battery voltage on the engine page: a dash before the first reading, red when low or too high."""
+    h.start_app(pids={"battery": -1})
+    h.check(h.eval("batteryText.text") == "--" and h.eval("String(batteryText.color)") == "#ffffff",
+            "a dash, not red, before the ESP32 has a reading")
+    for volts, text, colour in ((12.4, "12.4 V", "#ffffff"), (11.6, "11.6 V", "#ce1845"), (14.4, "14.4 V", "#ffffff"),
+                                (15.4, "15.4 V", "#ce1845")):
+        with h.mock.lock:
+            h.mock.pids["battery"] = volts
+        h.check(h.wait_until("batteryText.text === %r" % text, 2000) and h.eval("String(batteryText.color)") == colour,
+                "%s reads %s, %s" % (volts, text, "red" if colour != "#ffffff" else "white"))
 
 
 @scenario

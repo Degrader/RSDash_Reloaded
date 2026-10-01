@@ -39,13 +39,16 @@ Rectangle {
         { gaugeId: vertGState,    param: "vertG" },
         { gaugeId: yawBar,        param: "yaw" },
         { gaugeId: steeringBar,   param: "steering" },
-        { gaugeId: brakeBar,      param: "brake" }
+        { gaugeId: brakeBar,      param: "brake" },
+        { gaugeId: batteryState,  param: "battery" }
     ]
 
     Item { id: gearState;  property real currentValue: -1 }
     Item { id: latGState;  property real currentValue: 0 }
     Item { id: longGState; property real currentValue: 0 }
     Item { id: vertGState; property real currentValue: 0 }
+    // Volts at the OBD port; -1 until the ESP32 has a reading
+    Item { id: batteryState; property real currentValue: -1 }
 
     PageChrome {
         id: chrome
@@ -386,7 +389,7 @@ Rectangle {
         id: driverBars
         x: 70
         y: 382
-        width: 440
+        width: 350
         spacing: 3
 
         // Pressure on the brake pedal, % of the sensor's range
@@ -434,6 +437,42 @@ Rectangle {
             minValue: -90
             maxValue: 90
             valueText: Math.round(currentValue) + " °/s"
+        }
+    }
+
+    // --- Battery voltage, between the bars and the clock
+
+    Item {
+        id: batteryArea
+        x: 430
+        y: 372
+        width: 120
+        height: 90
+
+        Text {
+            id: batteryLabel
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 6
+            font.pixelSize: 15
+            font.weight: Font.Bold
+            color: "#F8E63C"
+            text: "BATTERY"
+        }
+
+        // Red when the battery is flat (under 12 V with the engine off, and
+        // lower than the alternator should ever leave it with it running) or
+        // the charging is too high
+        Text {
+            id: batteryText
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: batteryLabel.bottom
+            anchors.topMargin: 2
+            font.pixelSize: 32
+            font.weight: Font.Bold
+            color: batteryState.currentValue >= 0 && (batteryState.currentValue < 12 || batteryState.currentValue > 15)
+                   ? "#ce1845" : "white"
+            text: batteryState.currentValue < 0 ? "--" : batteryState.currentValue.toFixed(1) + " V"
         }
     }
 

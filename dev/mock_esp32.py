@@ -28,6 +28,7 @@ DEFAULT_PIDS = {
     "boost": 0.9, "coolant": 91, "iat": 28,               # bar, C, C
     "speed": 87, "wheelFL": 87, "wheelFR": 87.5, "wheelRL": 86.5, "wheelRR": 87,   # km/h
     "gear": 3, "latG": 0.35, "longG": 0.2, "vertG": 1.0,  # g
+    "battery": 13.8,                                      # V at the OBD port
     "yaw": 6, "steering": -40, "brake": 20,               # deg/s, deg (positive right), % of range
 }
 
