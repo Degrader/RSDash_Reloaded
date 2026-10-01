@@ -8,11 +8,16 @@
  ***************************************************************************/
 
 import QtQuick 2.6
-import QtQuick.Controls 1.3
 
 import "Components"
 import "Components/Controller.js" as Controller
 
+// The engine page, the first of the two gauge pages: boost, the gear and
+// the G-force plot across the top; coolant, oil, intake air, PTU and RDU
+// temps in a row; and small brake, steering and yaw bars with the date and
+// time along the bottom.
+// Tapping the logo opens the AWD page (AwdView.qml); the button on the left
+// edge opens Controls.
 Rectangle {
     id: primaryViewRect
     width: 800
@@ -20,326 +25,112 @@ Rectangle {
     color: "black"
 
     property var pidsData: [
-        { gaugeId: ptuGauge,            param: "ptu" },
-        { gaugeId: rduGauge,            param: "rdu" },
-        { gaugeId: lambdaGauge,         param: "lambda" },
-        { gaugeId: oilGauge,            param: "engine" },
+        { gaugeId: boostGauge,    param: "boost" },
+        { gaugeId: gearState,     param: "gear" },
 
-        { gaugeId: frontLeftTireGauge,  param: "flw" },
-        { gaugeId: frontRightTireGauge, param: "frw" },
-        { gaugeId: rearLeftTireGauge,   param: "rlw" },
-        { gaugeId: rearRightTireGauge,  param: "rrw" },
+        { gaugeId: coolantGauge,  param: "coolant" },
+        { gaugeId: oilGauge,      param: "engine" },
+        { gaugeId: iatGauge,      param: "iat" },
+        { gaugeId: ptuGauge,      param: "ptu" },
+        { gaugeId: rduGauge,      param: "rdu" },
 
-        { gaugeId: leftRDUTempGauge,    param: "rdutl" },
-        { gaugeId: rightRDUTempGauge,   param: "rdutr" },
-        { gaugeId: leftRDUTqGauge,      param: "rdutql" },
-        { gaugeId: rightRDUTqGauge,     param: "rdutqr" }
+        { gaugeId: latGState,     param: "latG" },
+        { gaugeId: longGState,    param: "longG" },
+        { gaugeId: vertGState,    param: "vertG" },
+        { gaugeId: yawBar,        param: "yaw" },
+        { gaugeId: steeringBar,   param: "steering" },
+        { gaugeId: brakeBar,      param: "brake" }
     ]
 
-    Image {
-        id: closeButton
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 5
-        width: 34
-        fillMode: Image.PreserveAspectFit
-        source: "res/close.png"
-        mipmap: true
+    Item { id: gearState;  property real currentValue: -1 }
+    Item { id: latGState;  property real currentValue: 0 }
+    Item { id: longGState; property real currentValue: 0 }
+    Item { id: vertGState; property real currentValue: 0 }
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                backMouseArea.enabled = true
-                back();
-            }
-        }
+    PageChrome {
+        id: chrome
+        anchors.fill: parent
     }
 
-
-    Image {
+    ReadyToRace {
         id: readyToRaceLogo
-        anchors.centerIn: parent
-        height: 400
-        z: 999
-        fillMode: Image.PreserveAspectFit
-        source: "res/rtr.png"
-        smooth: true
-        mipmap: true
-        scale: 1.0
-        opacity: 0.0
-
-        // rtrDisplayed is checked in onConditionOkChanged rather than here:
-        // fadeInAnim sets it while conditionOk is still changing, which made
-        // this a binding loop.
-        property bool conditionOk: oilGauge.currentValue >= oilGauge.lowTreshold
-                                   && rduGauge.currentValue >= rduGauge.lowTreshold
-                                   && ptuGauge.currentValue >= ptuGauge.lowTreshold
-
-        Timer {
-            id: mainTimer
-            interval: 3000
-            repeat: false
-            onTriggered: {
-                fadeOutAnim.start()
-                scaleAnim.running = false
-            }
-        }
-
-        SequentialAnimation {
-            id: fadeInAnim
-            running: false
-            onStarted: {
-                readyToRaceLogo.opacity = 0
-                readyToRaceLogo.scale = 1.0
-                scaleAnim.running = true
-                rtrDisplayed = true
-            }
-            PropertyAnimation { target: readyToRaceLogo; property: "opacity"; from: 0; to: 1; duration: 500 }
-            ScriptAction { script: mainTimer.start() }
-        }
-
-        PropertyAnimation {
-            id: fadeOutAnim
-            target: readyToRaceLogo
-            property: "opacity"
-            from: 1
-            to: 0
-            duration: 500
-        }
-
-        SequentialAnimation {
-            id: scaleAnim
-            loops: Animation.Infinite
-            running: false
-            PropertyAnimation { target: readyToRaceLogo; property: "scale"; to: 1.3; duration: 400; easing.type: Easing.InOutQuad }
-            PropertyAnimation { target: readyToRaceLogo; property: "scale"; to: 0.8; duration: 400; easing.type: Easing.InOutQuad }
-        }
-
-        onConditionOkChanged: {
-            if (conditionOk && !rtrDisplayed) {
-                fadeInAnim.start()
-            }
-        }
+        oil: oilGauge.currentValue
+        ptu: ptuGauge.currentValue
+        rdu: rduGauge.currentValue
     }
 
-    Image {
-        id: settingsButton
-        // Bottom left corner, below RDU's ring (the close button has the
-        // top left)
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.margins: 5
-        width: 34
-        fillMode: Image.PreserveAspectFit
-        source: "res/settings.png"
-        mipmap: true
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: loader.source = "SettingsView.qml"
-        }
-    }
+    // --- Top row: boost, gear and logo, G-force
 
     PlasmaGauge {
-        id: ptuGauge
-        anchors.top: parent.top
-        anchors.topMargin: 20
-        // Centred: the four big gauges, the gap, and the right column
-        anchors.left: parent.left
-        anchors.leftMargin: (parent.width - (2 * width + 8 + 10 + sensorArea.width)) / 2
+        id: boostGauge
+        x: 70
+        y: 4
         height: size
         width: size
         size: 210
         thick: 24
 
-        unitSymbol: "°"
+        unitSymbol: ""
 
-        name: "PTU"
-        nameSize: 25
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 43
-        minValue: 0
-        maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
-
-        lowTreshold: 50
-        highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
-    }
-
-    PlasmaGauge {
-        id: rduGauge
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 10
-        anchors.left: ptuGauge.left
-        width: size
-        height: size
-        size: 210
-        thick: 24
-
-        unitSymbol: "°"
-
-        name: "RDU"
-        nameSize: 25
+        name: "Boost " + Controller.unitLabel("pressure")
+        nameSize: 22
 
         primaryColor: "#0c32ff"
         secondaryColor: "#ce1845"
 
         valueSize: 43
+        // Bar (limits set in psi); 0 under vacuum
         minValue: 0
-        maxValue: 130
+        maxValue: 35 / 14.5038
 
-        decimal: 0
-        measureType: "temperature"
+        decimal: 1
+        measureType: "pressure"
 
-        lowTreshold: 20
-        highTreshold: 110
+        lowTreshold: -1
+        highTreshold: 2.2
 
         startAngleDegrees: 145
         endAngleDegrees: 395
     }
 
-    PlasmaGauge {
-        id: oilGauge
-        anchors.top: ptuGauge.top
-        anchors.left: ptuGauge.right
-        anchors.leftMargin: 8
-        height: size
-        width: size
-        size: 210
-        thick: 24
+    // Between boost and the G-force plot
+    Item {
+        id: gearArea
+        x: boostGauge.x + boostGauge.width
+        width: gForceGauge.x - x
+        y: 0
+        height: 140
 
-        unitSymbol: "°"
+        Text {
+            id: gearLabel
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 14
+            font.pixelSize: 20
+            font.weight: Font.Bold
+            color: "#F8E63C"
+            text: "GEAR"
+        }
 
-        name: "Oil"
-        nameSize: 24
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 43
-        minValue: 0
-        maxValue: 150
-
-        decimal: 0
-        measureType: "temperature"
-
-        lowTreshold: 65
-        highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
+        Text {
+            id: gearText
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: gearLabel.bottom
+            anchors.topMargin: -6
+            font.pixelSize: 100
+            font.weight: Font.Bold
+            color: "white"
+            // 0 neutral, 1-6, 7 reverse; -1 when the car isn't saying
+            text: gearState.currentValue < 0 ? "-" : (gearState.currentValue === 0 ? "N"
+                  : (gearState.currentValue === 7 ? "R" : String(gearState.currentValue)))
+        }
     }
 
-    PlasmaGauge {
-        id: lambdaGauge
-        anchors.bottom: rduGauge.bottom
-        anchors.left: oilGauge.left
-        height: size
-        width: size
-        size: 210
-        thick: 24
-
-        unitSymbol: "^"
-        ignoreUnit: true
-
-        name: "Lambda"
-        nameSize: 25
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        decimal: 2
-        measureType: "raw"
-
-        valueSize: 43
-        minValue: 0
-        maxValue: 2
-
-        lowTreshold: 0.5
-        highTreshold: 1.5
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
-
-        // OBD "Alone" - see torqueSplitGauge for "Not Alone"
-        visible: !notAlone
-    }
-
-    // In OBD "Not Alone" mode (settings page) the ESP32 stops requesting
-    // lambda, the only value it asks the PCM for, so this slot shows how the
-    // rear torque is split between the left and right RDU clutches instead:
-    // each half is that clutch's share of the total, in %. The clutch torques
-    // come from the AWD module and keep updating.
-    SplitPlasmaGauge {
-        id: torqueSplitGauge
-        anchors.fill: lambdaGauge
-        visible: notAlone
-
-        // Below this total (Nm) there's no real split to show, e.g. cruising
-        // or parked, so both halves read 0 instead of jumping around.
-        readonly property real minTotal: 10
-        readonly property real total: leftRDUTqGauge.currentValue + rightRDUTqGauge.currentValue
-
-        thick: 24
-
-        caption: "OBD\nNOT ALONE"
-        captionColor: "#329BFD"
-        captionSize: 14
-
-        name: "Torque Split"
-        nameSize: 20
-
-        unitSymbol: "%"
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        // Spread out so "47%" and "53%" don't run together; "100%" still
-        // clears the ring
-        valueSize: 24
-        valueSpread: 40
-        decimal: 0
-        measureType: "raw"
-
-        minValue: 0
-        maxValue: 100
-
-        // A share is never "too high" or "too low", so it never turns red
-        lowTreshold: 0
-        highTreshold: 100
-
-        leftValue: total >= minTotal ? 100 * leftRDUTqGauge.currentValue / total : 0
-        rightValue: total >= minTotal ? 100 * rightRDUTqGauge.currentValue / total : 0
-    }
-
-    // In the free space between the four big gauges, pulsing. The top
-    // gauges' rings are open at the bottom, so that space is centred higher
-    // than the gauges themselves: midway between the lower ends of the top
-    // rings and the tops of the bottom rings. The image has transparent
-    // space above and below the artwork, so at 80 px tall the visible part
-    // clears all four rings by about 14 px at the top of its pulse.
-    // Tapping it opens the Controls page.
+    // Tapping it opens the AWD page
     Image {
         id: nutronLogo
-        height: 80
-
-        // Lowest point of the top rings (their ends) and highest point of
-        // the bottom rings, including the rings' thickness
-        readonly property real topRingsBottom: ptuGauge.y + ptuGauge.height / 2
-            + (ptuGauge.width / 2 - ptuGauge.thick) * Math.sin(ptuGauge.startAngleDegrees * Math.PI / 180)
-            + ptuGauge.thick / 2
-        readonly property real bottomRingsTop: rduGauge.y + rduGauge.thick / 2
-
-        x: (ptuGauge.x + oilGauge.x + oilGauge.width) / 2 - width / 2
-        y: (topRingsBottom + bottomRingsTop) / 2 - height / 2
+        height: 56
+        x: gearArea.x + gearArea.width / 2 - width / 2
+        y: 150
         fillMode: Image.PreserveAspectFit
         source: "res/mountuners.png"
         smooth: true
@@ -372,348 +163,324 @@ Rectangle {
         MouseArea {
             id: logoButton
             anchors.fill: parent
-            onClicked: loader.source = "ControlsView.qml"
+            onClicked: loader.source = "AwdView.qml"
         }
     }
 
-    // Right column, four rows: front and rear tire pressures, RDU clutch
-    // temps and RDU torque, all shown at once.
+    GForceGauge {
+        id: gForceGauge
+        x: 514
+        y: 6
+        width: 188
+        height: 188
+        latG: latGState.currentValue
+        longG: longGState.currentValue
+    }
+
+    Text {
+        id: gForceName
+        anchors.horizontalCenter: gForceGauge.horizontalCenter
+        anchors.top: gForceGauge.bottom
+        anchors.topMargin: 0
+        font.pixelSize: 16
+        font.weight: Font.Bold
+        color: "#F8E63C"
+        text: "G-Force"
+    }
+
+    Column {
+        id: gReadouts
+        x: 706
+        y: 14
+        width: 94
+        spacing: 12
+
+        Repeater {
+            model: [
+                { label: "Lateral",      source: latGState },
+                { label: "Fore / aft",    source: longGState },
+                { label: "Vertical",     source: vertGState }
+            ]
+
+            Column {
+                width: gReadouts.width
+
+                Text {
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: "#F8E63C"
+                    text: modelData.label
+                }
+
+                Text {
+                    font.pixelSize: 26
+                    font.weight: Font.Bold
+                    color: "white"
+                    text: modelData.source.currentValue.toFixed(2) + " g"
+                }
+            }
+        }
+    }
+
+    // --- Temps: engine (coolant, oil, intake air), then the AWD system (PTU, RDU)
+
+    PlasmaGauge {
+        id: coolantGauge
+        x: 70
+        y: 222
+        height: size
+        width: size
+        size: 136
+        thick: 15
+
+        unitSymbol: "°"
+
+        name: "Coolant"
+        nameSize: 15
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 30
+        minValue: 0
+        maxValue: 130
+
+        decimal: 0
+        measureType: "temperature"
+
+        lowTreshold: 60
+        highTreshold: 110
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+    }
+
+    PlasmaGauge {
+        id: oilGauge
+        x: coolantGauge.x + 147
+        y: coolantGauge.y
+        height: size
+        width: size
+        size: 136
+        thick: 15
+
+        unitSymbol: "°"
+
+        name: "Oil"
+        nameSize: 15
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 30
+        minValue: 0
+        maxValue: 150
+
+        decimal: 0
+        measureType: "temperature"
+
+        lowTreshold: 65
+        highTreshold: 110
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+    }
+
+    PlasmaGauge {
+        id: iatGauge
+        x: oilGauge.x + 147
+        y: coolantGauge.y
+        height: size
+        width: size
+        size: 136
+        thick: 15
+
+        unitSymbol: "°"
+
+        name: "Intake"
+        nameSize: 15
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 30
+        // Can read below freezing; only a hot intake is a problem
+        minValue: -20
+        maxValue: 80
+
+        decimal: 0
+        measureType: "temperature"
+
+        lowTreshold: -100
+        highTreshold: 60
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+    }
+
+    PlasmaGauge {
+        id: ptuGauge
+        x: iatGauge.x + 147
+        y: coolantGauge.y
+        height: size
+        width: size
+        size: 136
+        thick: 15
+
+        unitSymbol: "°"
+
+        name: "PTU"
+        nameSize: 15
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 30
+        minValue: 0
+        maxValue: 130
+
+        decimal: 0
+        measureType: "temperature"
+
+        lowTreshold: 50
+        highTreshold: 110
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+    }
+
+    PlasmaGauge {
+        id: rduGauge
+        x: ptuGauge.x + 147
+        y: coolantGauge.y
+        height: size
+        width: size
+        size: 136
+        thick: 15
+
+        unitSymbol: "°"
+
+        name: "RDU"
+        nameSize: 15
+
+        primaryColor: "#0c32ff"
+        secondaryColor: "#ce1845"
+
+        valueSize: 30
+        minValue: 0
+        maxValue: 130
+
+        decimal: 0
+        measureType: "temperature"
+
+        lowTreshold: 20
+        highTreshold: 110
+
+        startAngleDegrees: 145
+        endAngleDegrees: 395
+    }
+
+    // --- Bottom: what the driver is doing
+
+    Column {
+        id: driverBars
+        x: 70
+        y: 382
+        width: 440
+        spacing: 3
+
+        // Pressure on the brake pedal, % of the sensor's range
+        BarGauge {
+            id: brakeBar
+            width: parent.width
+            height: 22
+            textSize: 14
+            barHeight: 10
+            labelWidth: 70
+            valueWidth: 76
+            name: "Brake"
+            minValue: 0
+            maxValue: 100
+            valueText: Math.round(currentValue) + " %"
+        }
+
+        // Degrees from straight ahead, positive to the right
+        BarGauge {
+            id: steeringBar
+            width: parent.width
+            height: 22
+            textSize: 14
+            barHeight: 10
+            labelWidth: 70
+            valueWidth: 76
+            name: "Steering"
+            centered: true
+            minValue: -450
+            maxValue: 450
+            valueText: Math.round(Math.abs(currentValue)) + "° " + (currentValue < -0.5 ? "L" : (currentValue > 0.5 ? "R" : ""))
+        }
+
+        // How fast the car is rotating, degrees per second
+        BarGauge {
+            id: yawBar
+            width: parent.width
+            height: 22
+            textSize: 14
+            barHeight: 10
+            labelWidth: 70
+            valueWidth: 76
+            name: "Yaw"
+            centered: true
+            minValue: -90
+            maxValue: 90
+            valueText: Math.round(currentValue) + " °/s"
+        }
+    }
+
+    // --- The system's date and time, bottom right
+
+    // The time shown; the harness sets it to check the formatting
+    property date now: new Date()
+
+    Timer {
+        id: clockTimer
+        interval: 5000
+        running: true
+        repeat: true
+        onTriggered: now = new Date()
+    }
+
     Item {
-        id: sensorArea
-        anchors.top: parent.top
-        anchors.left: oilGauge.right
-        anchors.leftMargin: 10
-        anchors.bottom: parent.bottom
-        width: 250
+        id: clockArea
+        x: 560
+        y: 372
+        width: 236
+        height: 90
 
-        SemiCircularGauge {
-            id: frontLeftTireGauge
-            anchors.left: parent.left
+        // In the system's own format, so 12 or 24 hour as the Sync 3 is set
+        Text {
+            id: timeText
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 8
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 4
-
-            decimal: 1
-            measureType: "pressure"
-
-            // Values are in bar; limits set in psi
-            lowTreshold: 35 / 14.5038
-            highTreshold: 50 / 14.5038
-            showThresholdMarks: true
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        Text {
-            id: frontText
-            anchors.centerIn: frontLeftTireGauge
-            anchors.horizontalCenterOffset: 70
-
+            font.pixelSize: 46
             font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "Front"
+            color: "white"
+            text: Qt.formatTime(now, Qt.DefaultLocaleShortDate)
         }
 
-        SemiCircularGauge {
-            id: frontRightTireGauge
-            anchors.bottom: frontLeftTireGauge.bottom
-            anchors.left: frontLeftTireGauge.right
-            anchors.leftMargin: 30
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 4
-
-            decimal: 1
-            measureType: "pressure"
-
-            // Values are in bar; limits set in psi
-            lowTreshold: 35 / 14.5038
-            highTreshold: 50 / 14.5038
-            showThresholdMarks: true
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
-        }
-
-        // Between the front and rear rows
         Text {
-            id: tpmsText
+            id: dateText
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: frontLeftTireGauge.bottom
-            anchors.verticalCenterOffset: 4
-
+            anchors.top: timeText.bottom
+            anchors.topMargin: -2
+            font.pixelSize: 18
             font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
             color: "#F8E63C"
-            text: "TPMS"
-        }
-
-        SemiCircularGauge {
-            id: rearLeftTireGauge
-            anchors.left: frontLeftTireGauge.left
-            anchors.top: frontLeftTireGauge.bottom
-            anchors.topMargin: 8
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 4
-
-            decimal: 1
-            measureType: "pressure"
-
-            // Values are in bar; limits set in psi
-            lowTreshold: 35 / 14.5038
-            highTreshold: 50 / 14.5038
-            showThresholdMarks: true
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        Text {
-            id: rearText
-            anchors.centerIn: rearRightTireGauge
-            anchors.horizontalCenterOffset: -70
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "Rear"
-        }
-
-        SemiCircularGauge {
-            id: rearRightTireGauge
-            anchors.top: rearLeftTireGauge.top
-            anchors.left: rearLeftTireGauge.right
-            anchors.leftMargin: 30
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 23
-            minValue: 0
-            maxValue: 4
-
-            decimal: 1
-            measureType: "pressure"
-
-            // Values are in bar; limits set in psi
-            lowTreshold: 35 / 14.5038
-            highTreshold: 50 / 14.5038
-            showThresholdMarks: true
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
-        }
-
-        // RDU clutch temps: 0-120 C scale, red line at 105 C
-        SemiCircularGauge {
-            id: leftRDUTempGauge
-            anchors.left: rearLeftTireGauge.left
-            anchors.top: rearLeftTireGauge.bottom
-            anchors.topMargin: 8
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 21
-            valueOffset: -4
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 105
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        Text {
-            id: rduTempText
-            anchors.centerIn: leftRDUTempGauge
-            anchors.horizontalCenterOffset: 70
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "Temps"
-        }
-
-        SemiCircularGauge {
-            id: rightRDUTempGauge
-            anchors.top: leftRDUTempGauge.top
-            anchors.left: leftRDUTempGauge.right
-            anchors.leftMargin: 30
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            unitSymbol: "°"
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 21
-            valueOffset: 4
-            minValue: 0
-            maxValue: 120
-
-            decimal: 0
-            measureType: "temperature"
-
-            lowTreshold: 0
-            highTreshold: 105
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
-        }
-
-        // Between the temps and torque rows
-        Text {
-            id: rduText
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: leftRDUTempGauge.bottom
-            anchors.verticalCenterOffset: 4
-
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "RDU"
-        }
-
-        // RDU torque. Also feeds the torque split gauge that replaces lambda
-        // in OBD Not Alone mode.
-        SemiCircularGauge {
-            id: leftRDUTqGauge
-            anchors.left: leftRDUTempGauge.left
-            anchors.top: leftRDUTempGauge.bottom
-            anchors.topMargin: 8
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 21
-            valueOffset: -4
-            minValue: 0
-            maxValue: 1600
-
-            decimal: 0
-            measureType: "torque"
-
-            lowTreshold: 1
-            highTreshold: 1600
-
-            startAngleDegrees: 70
-            endAngleDegrees: 290
-        }
-
-        Text {
-            id: rduTorqueText
-            anchors.centerIn: leftRDUTqGauge
-            anchors.horizontalCenterOffset: 70
-            font.weight: Font.Bold
-            font.pixelSize: 23
-            horizontalAlignment: Text.AlignHCenter
-            color: "#F8E63C"
-            text: "Torque"
-        }
-
-        SemiCircularGauge {
-            id: rightRDUTqGauge
-            anchors.top: leftRDUTqGauge.top
-            anchors.left: leftRDUTqGauge.right
-            anchors.leftMargin: 30
-
-            width: size
-            height: size
-            size: 110
-            thick: 12
-
-            primaryColor: "#0c32ff"
-            secondaryColor: "#ce1845"
-
-            valueSize: 21
-            valueOffset: 4
-            minValue: 0
-            maxValue: 1600
-
-            decimal: 0
-            measureType: "torque"
-
-            lowTreshold: 1
-            highTreshold: 1600
-
-            startAngleDegrees: 110
-            endAngleDegrees: 250
-
-            reverse: true
+            text: Qt.formatDate(now, "dddd, MMM d")
         }
     }
 
-    // Polls live PID values (temps, pressures, etc.) at the configured
-    // refresh rate. The OBD Alone / Not Alone mode is intentionally NOT
-    // checked here - see notAloneTimer below.
+    // Polls live PID values at the configured refresh rate
     Timer {
         id: fetchDataTimer
         interval: refresh
@@ -724,24 +491,9 @@ Rectangle {
         }
     }
 
-    // The OBD mode rarely changes mid-drive (it's set on the settings page,
-    // or from the RSapp phone app, which shares it through the ESP32).
-    // Polling it on the same 250ms cadence as live sensor data just doubled
-    // network traffic to the ESP32 for no benefit, so it gets its own, much
-    // slower timer instead.
-    Timer {
-        id: notAloneTimer
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: {
-            Controller.checkNotAlone();
-        }
-    }
-
     Component.onCompleted: {
         console.log("Primary View Loaded. Fetching data due to Page Load...")
+        mainPageSource = "PrimaryView.qml"
         Controller.fetchData("pids", pidsData);
-        Controller.checkNotAlone();
     }
 }

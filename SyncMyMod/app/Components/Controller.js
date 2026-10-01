@@ -40,6 +40,8 @@ function loadSettings() {
                         pressureUnit = line.split("=")[1];
                     } else if (line.indexOf("TorqueUnit=") === 0) {
                         torqueUnit = line.split("=")[1];
+                    } else if (line.indexOf("SpeedUnit=") === 0) {
+                        speedUnit = line.split("=")[1];
                     }
                 }
             } else {
@@ -83,6 +85,8 @@ function fetchData(endpoint, data) {
 
             for (var i = 0; i < data.length; ++i) {
                 var gaugeItem = data[i];
+                // Skip a value this firmware doesn't send
+                if (jsonData[gaugeItem.param] === undefined) continue;
                 gaugeItem.gaugeId.currentValue = jsonData[gaugeItem.param];
             }
         }
@@ -131,7 +135,8 @@ function checkNotAlone(force) {
     xhr.send();
 }
 
-// onDone (optional): called with true/false for whether the POST succeeded.
+// onDone (optional): called with true/false for whether the POST succeeded,
+// and the HTTP status (0 if the ESP32 didn't answer).
 function sendData(endpoint, gauge, value, control, onDone) {
     var xhr = new XMLHttpRequest();
     xhr.open("POST", mainUrl + endpoint, true);
@@ -149,7 +154,7 @@ function sendData(endpoint, gauge, value, control, onDone) {
                 }
             } else {
             }
-            if (onDone) onDone(xhr.status === 200);
+            if (onDone) onDone(xhr.status === 200, xhr.status);
         }
     };
     xhr.send(JSON.stringify(data));
@@ -190,28 +195,43 @@ function getValueREADABLE() {
 // gauges that show more than one reading.
 function getValue(value) {
     if (value === undefined) value = currentValue;
-    if (measureType === "raw") return value.toFixed(decimal);
-    if (ignoreUnit) return value.toFixed(decimal);
+    return formatValue(ignoreUnit ? "raw" : measureType, value, decimal);
+}
 
+// A value from the ESP32 as text in the unit chosen on the settings page.
+// kind: "temperature", "pressure", "torque" or "speed" (anything else is
+// shown as it is). The ESP32 sends degrees C, bar, Nm and km/h.
+function formatValue(kind, value, decimals) {
     var conversion = {
         pressure: { "Bar": 1, "PSI": 14.5038 },
         temperature: { "Celsius": 1, "Fahrenheit": function(value) { return (value * 9/5) + 32; } },
-        torque: { "Nm": 1, "Lb-Ft": 0.7376 }
+        torque: { "Nm": 1, "Lb-Ft": 0.7376 },
+        speed: { "km/h": 1, "mph": 0.621371 }
     };
 
     var unitMap = {
         pressure: pressureUnit,
         temperature: temperatureUnit,
-        torque: torqueUnit
+        torque: torqueUnit,
+        speed: speedUnit
     };
 
-    var unit = unitMap[measureType];
+    var unit = unitMap[kind];
 
-    if (!conversion[measureType] || !unit) return value.toFixed(decimal);
+    if (!conversion[kind] || !unit) return value.toFixed(decimals);
 
-    var factor = conversion[measureType][unit];
+    var factor = conversion[kind][unit];
 
-    return (typeof factor === "function" ? factor(value) : value * factor).toFixed(decimal);
+    return (typeof factor === "function" ? factor(value) : value * factor).toFixed(decimals);
+}
+
+// The unit's short label for formatValue's kind, e.g. "°C" or "mph"
+function unitLabel(kind) {
+    if (kind === "temperature") return temperatureUnit === "Fahrenheit" ? "°F" : "°C";
+    if (kind === "pressure") return pressureUnit === "PSI" ? "PSI" : "BAR";
+    if (kind === "torque") return torqueUnit === "Lb-Ft" ? "lb-ft" : "Nm";
+    if (kind === "speed") return speedUnit === "mph" ? "mph" : "km/h";
+    return "";
 }
 
 var COLD_MARK_COLOUR = "#329BFD";

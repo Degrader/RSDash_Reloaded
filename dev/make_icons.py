@@ -38,6 +38,7 @@ SOURCES = {
     "espSport": "main_page/esp_sport_1.svg",
     "autoStartStopOff": "main_page/auto_start_stop_off.svg",
     "driftStick": "main_page/drift_stick_1.svg",
+    "controlsGridRight": "main_page/controls_grid_right.svg",
     "modeNormal": "drive_mode_icons/drive_mode_normal.svg",
     "modeSport": "drive_mode_icons/drive_mode_sport.svg",
     "modeTrack": "drive_mode_icons/drive_mode_track.svg",

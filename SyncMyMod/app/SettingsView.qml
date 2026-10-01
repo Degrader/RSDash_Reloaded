@@ -70,7 +70,7 @@ Rectangle {
         MouseArea {
             anchors.fill: parent
             onClicked: {
-                loader.source = "PrimaryView.qml"
+                loader.source = mainPageSource
             }
         }
     }
@@ -90,7 +90,7 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
-        spacing: 20
+        spacing: 14
 
         CustomToggle {
             id: temperatureToggle
@@ -125,6 +125,25 @@ Rectangle {
                 onClicked: {
                     mouse.accepted = false
                     pressureToggle.currentState = (pressureToggle.currentState === pressureToggle.option1 ? pressureToggle.option2 : pressureToggle.option1);
+                    saveSettings()
+                }
+            }
+        }
+
+        CustomToggle {
+            id: speedToggle
+            label: "Speed"
+            option1: "km/h"
+            option2: "mph"
+            currentState: speedUnit
+
+            MouseArea {
+                id: speedToggleMouseArea
+                anchors.fill: parent
+                propagateComposedEvents: true
+                onClicked: {
+                    mouse.accepted = false
+                    speedToggle.currentState = (speedToggle.currentState === speedToggle.option1 ? speedToggle.option2 : speedToggle.option1);
                     saveSettings()
                 }
             }
@@ -247,9 +266,11 @@ Rectangle {
         content += "TemperatureUnit=" + temperatureToggle.currentState + "\n";
         content += "PressureUnit=" + pressureToggle.currentState + "\n";
         content += "TorqueUnit=" + torqueToggle.currentState + "\n";
+        content += "SpeedUnit=" + speedToggle.currentState + "\n";
         temperatureUnit = temperatureToggle.currentState
         pressureUnit = pressureToggle.currentState
         torqueUnit = torqueToggle.currentState
+        speedUnit = speedToggle.currentState
         xhr.send(content);
     }
 }

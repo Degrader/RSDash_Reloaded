@@ -11,9 +11,10 @@ import QtQuick 2.6
 
 import "Components"
 
-// What each control does, opened from the settings page: the main view's
-// close button, settings button and logo, then each tile on the Controls
-// page, shown as it looks when lit. Descriptions follow the RSdash manual.
+// What each control does, opened from the settings page: the gauge pages'
+// close, settings and Controls buttons and the logo, then each tile on the
+// Controls page, shown as it looks when lit. Descriptions follow the RSdash
+// manual.
 Rectangle {
     id: controlsHelpViewRect
     width: 800
@@ -93,11 +94,27 @@ Rectangle {
         }
 
         HelpRow {
+            id: controlsButtonHelp
+            width: parent.width
+            iconSize: 44
+            label: "Controls"
+            description: "The button on the left edge opens the Controls page, with the controls below."
+
+            SvgIcon {
+                anchors.centerIn: parent
+                width: 44
+                height: 44
+                icon: "controlsGridRight"
+                color: controlsColour
+            }
+        }
+
+        HelpRow {
             id: logoHelp
             width: parent.width
             iconSize: 44
-            label: "Logo - Controls"
-            description: "Tap the logo between the big gauges to open the Controls page, with the controls below."
+            label: "Logo - Second page"
+            description: "Tap the logo to switch between the engine page and the AWD page."
 
             Image {
                 anchors.centerIn: parent
@@ -113,8 +130,7 @@ Rectangle {
             width: parent.width
             iconSize: 44
             label: "Launch Control"
-            description: "Turns automatic Launch Control on or off, right away. Keep it off if your engine tune "
-                         + "already turns Launch Control on."
+            description: "Automatic Launch Control on or off, right away. Leave it off if your tune already enables it."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -136,7 +152,7 @@ Rectangle {
             width: parent.width
             iconSize: 44
             label: "ESP Sport (at startup)"
-            description: "Whether the car starts with Sport traction control. Applies the next time the car starts."
+            description: "Whether the car starts with Sport traction control. The top row's ESP tile changes it now."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -158,8 +174,7 @@ Rectangle {
             width: parent.width
             iconSize: 44
             label: "Drive Mode (at startup)"
-            description: "The mode the car starts in: Normal, Sport, Track, Drift or Custom. Applies the next time "
-                         + "the car starts; while driving, use the car's drive mode button."
+            description: "The mode the car starts in. The top row's Drive Mode tile changes it now."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -181,8 +196,7 @@ Rectangle {
             width: parent.width
             iconSize: 44
             label: "Auto Start-Stop (at startup)"
-            description: "Whether the car starts with auto start-stop turned off. Leave it alone if your engine "
-                         + "tune already turns auto start-stop off."
+            description: "Whether the car starts with auto start-stop off. Leave it if your tune already turns it off."
 
             ButtonGauge {
                 anchors.fill: parent
@@ -204,8 +218,7 @@ Rectangle {
             width: parent.width
             iconSize: 44
             label: "Drift Stick"
-            description: "Rear wheel lock through the ABS: Off, Drift Only or All Modes, right away. Needs the ABS "
-                         + "module flashed with the right calibration."
+            description: "Rear wheel lock through the ABS: Off, Drift Only or All Modes. Needs a flashed ABS module."
 
             ButtonGauge {
                 anchors.fill: parent

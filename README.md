@@ -8,21 +8,21 @@ All credit for the original design, the gauge layout, and the ESP32 firmware goe
 
 ## Video tour
 
-![RSdash tour: live gauges, the Controls page (launch control, ESP Sport, auto start-stop, the drive mode and Drift Stick pop-ups), settings, OBD Not Alone and Ready To Race](docs/tour.gif)
+![RSdash tour: live gauges, the engine page, the AWD page, the Controls page (live drive mode and ESP, launch control, startup settings, Drift Stick), settings and Ready To Race](docs/tour.gif)
 
 A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by `dev/tour.py`, against the fake ESP32 with its values drifting. To re-record it after a UI change, run `python dev/tour.py`.
 
 ## Screenshots
 
-| Main view | Main view, OBD Not Alone |
+| Engine page | AWD page (tap the logo) |
 |:---:|:---:|
-| ![Main view: PTU, oil, RDU and lambda gauges with the logo between them (tap it for Controls); tire pressures, RDU clutch temps and RDU torque](docs/screenshots/main_view.png) | ![Main view in OBD Not Alone mode, with the RDU torque split (left / right share of rear torque) in place of lambda](docs/screenshots/main_view_not_alone.png) |
-| **Controls** (tap the logo) | **Drive mode pop-up** (tap Drive Mode) |
-| ![Controls page: Launch Control, ESP Sport, Drive Mode, Auto Start-Stop and Drift Stick tiles in a grid, each lit in its own colour, with their settings](docs/screenshots/controls.png) | ![Drive mode pop-up: Normal, Sport, Track, Drift and Custom, with the current mode lit](docs/screenshots/drive_mode_popup.png) |
+| ![Engine page: boost, gear and a G-force plot across the top; coolant, oil, intake, PTU and RDU temps; brake, steering and yaw bars](docs/screenshots/main_view.png) | ![AWD page: PTU, RDU and clutch temps with the torque, split, total and slip on the left; the car from above with each tyre's pressure and wheel speed on the right](docs/screenshots/awd_view.png) |
+| **Controls** (button on the left edge) | **Drive mode pop-up** (tap Drive Mode) |
+| ![Controls page: the car's drive mode and ESP, Launch Control and Drift Stick in the top row; the startup drive mode, ESP Sport and Auto Start-Stop under Startup](docs/screenshots/controls.png) | ![Drive mode pop-up: Normal, Sport, Track and Drift for the startup mode, with the current one lit](docs/screenshots/drive_mode_popup.png) |
 | **Drift Stick pop-up** (tap Drift Stick) | |
 | ![Drift Stick pop-up: Off, Drift Only and All Modes, with the current choice lit](docs/screenshots/drift_stick_popup.png) | |
 | **Settings** | **Controls help** (settings, bottom left) |
-| ![Settings page: temperature, pressure and torque units, the OBD mode, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, LC, ESP, drive mode, auto start-stop and Drift Stick buttons do](docs/screenshots/controls_help.png) |
+| ![Settings page: temperature, pressure, speed and torque units, the OBD mode, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, Controls and logo buttons and each control do](docs/screenshots/controls_help.png) |
 
 These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
@@ -129,6 +129,34 @@ Starting from v2.15.0, the controls have their own page:
   - Launch Control, ESP Sport and Auto Start-Stop switch with a tap. Drive Mode and Drift Stick open a pop-up showing all their options, the current one lit; tapping outside it or its close button leaves the setting as it was. A note at the bottom says which settings apply at the next start, and a short note after each change says what it did, or that the ESP32 couldn't be reached.
   - The grid has three columns and a free space, so more controls can be added: each is one `ControlTile` in `controlGrid`.
   - The main view is now just the gauges, centred across the screen, with the close button in the top left and the settings button in the bottom left. The drive mode and Drift Stick fans are gone (`RadialFan.qml` removed).
+
+Starting from v2.16.0, the Controls page tells live controls from startup ones and can change the car's drive mode and ESP:
+
+- **Controls page** (`SyncMyMod/app/ControlsView.qml`)
+  - Two rows. The top row, untitled, changes the car straight away: new **Drive Mode** and **ESP** tiles, then Launch Control and Drift Stick. Under the **Startup** heading: the saved Drive Mode, ESP Sport and Auto Start-Stop, applied the next time the car starts. The "at startup" suffixes are gone from the tiles; the group says it.
+  - The live Drive Mode tile (Normal, Sport, Track, Drift) and ESP tile (On, Sport, Off) show what the car is in now, read from `/pids` (`mode`, `esc`) every second, and open a pop-up. Picking an option sends `POST /control` (`{"mode": 0-3}` or `{"esc": 0-2}`) to the ESP32 firmware, which presses the car's buttons for you, and nothing is saved. Until `/pids` shows the new state (a drive mode change takes about 5 s) the tile says "Changing to Sport...". The tile says "Not available" while the car is asleep or the firmware doesn't report it (an older firmware just leaves it so).
+  - A note after a change says what it did, or why not: the car isn't ready (503, asleep or no CAN), the firmware is too old for `/control` (404), or the ESP32 couldn't be reached. (Qt reads a 409 "change already in progress" as no answer, so that shows the last one.)
+  - `Controller.fetchData` now ignores keys the firmware doesn't send, and `sendData`'s callback also gets the HTTP status. Tiles are slightly smaller (88 px buttons) to fit two rows.
+
+Starting from v2.17.0, the main view is two pages, and the left edge has a Controls button:
+
+- **Engine page** (`SyncMyMod/app/PrimaryView.qml`, `Components/GForceGauge.qml`, `Components/BarGauge.qml`)
+  - The page you land on. **Boost** is the big gauge on the left, with the **gear** (N, 1-6, R) and the pulsing logo in the middle and a **G-force plot** (a dot on 0.5 g rings, red past 1 g) with lateral, fore/aft and vertical G on the right. A row of five temp gauges follows: **coolant**, **oil**, **intake air**, **PTU** and **RDU** (blue and red marks at their cold and hot limits). **Brake**, **steering** and **yaw** are small bars along the bottom left; steering and yaw fill from the middle, so you can see which way. The system **date and time** are at the bottom right, in the Sync 3's own format. All of these come from the new firmware's `/pids` values (`boost`, `gear`, `coolant`, `iat`, `ptu`, `rdu`, `latG`, `longG`, `vertG`, `yaw`, `steering`, `brake`).
+  - There is no speed gauge. Lambda is gone too: the new firmware never asks the engine computer for it (`lambda` is always 0), so there is nothing to show. The Not Alone torque split gauge went with it, and the OBD toggle on the settings page no longer changes the gauge pages.
+  - Tapping the logo opens the AWD page.
+
+- **AWD page** (`SyncMyMod/app/AwdView.qml`, `Components/CarTopView.qml`)
+  - The left of the page is the AWD system: **PTU**, **RDU** and **left and right clutch** temp gauges, then bars for each clutch's **torque**, the **split** between them (left / right in %, filling from the middle towards the side carrying more; "- / -" under 10 Nm total), the **total** torque, and **slip**, how much faster the rear wheels turn than the front (red past 8 km/h). The clutches turn red past 105 °C, the PTU and RDU past 110 °C.
+  - The right of the page is a top-down drawing of the car (honeycomb grille, corner intakes, bonnet creases, glass and roof, rear wing, diffuser with twin exhausts) with a **tyre pressure** ring beside each tyre, opening towards it, and the **wheel speed** underneath, and the car's **speed** as text under it. A tyre is drawn red when its pressure is under 35 psi or over 50 psi, the same limits as before.
+  - Tapping the logo (top left) goes back to the engine page.
+
+- **Controls button** (`SyncMyMod/app/Components/PageChrome.qml`, `docs/icons/main_page/controls_grid_right.svg`)
+  - The button on the far left, centred between the close and settings buttons (the controls grid icon in green, set by `controlsColour` in `Nutron.qml`), opens the Controls page from either gauge page. The Controls and Settings back arrows return to the page you left (`mainPageSource` in `Nutron.qml`). The logo no longer opens Controls.
+  - `PageChrome` holds the close, Controls and settings buttons so both pages share them, and `ReadyToRace` holds the Ready To Race logo, which now watches PTU, RDU and oil from either page.
+
+- **Speed unit** (`SyncMyMod/app/SettingsView.qml`, `NutronConfig.ini`, `Components/Controller.js`)
+  - A new **Speed** toggle (km/h or mph) on the settings page, saved in the ini as `SpeedUnit`. The ESP32 sends km/h. It defaults to km/h; the wheel speeds on the AWD page follow it too. `Controller.formatValue()` and `unitLabel()` turn a value into text in the chosen units, for readings that aren't a gauge.
+  - Not checked on the car: which way `latG` and `longG` point. The G plot puts a positive lateral G to the right and a positive longitudinal G up; `flipLateral` and `flipLongitudinal` on `GForceGauge` swap them.
 
 ## Testing on a PC
 
@@ -283,4 +311,24 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Main view: the button column and fans are gone and the gauges are centred; the settings button moved to the bottom left corner; removed `RadialFan.qml`
 - Controls help: explains the logo and each control on the Controls page
 - Harness: Controls page, drive mode pop-up, Drift Stick pop-up and settings sync scenarios replace the main view button and fan scenarios; README screenshots of the Controls page and its pop-ups
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.16.0JC] - 2026-09-30
+- Controls page: split into an untitled top row that changes the car now (Drive Mode, ESP, Launch Control, Drift Stick) and Startup (Drive Mode, ESP Sport, Auto Start-Stop)
+- New live Drive Mode and ESP tiles: they show the car's current mode (from `/pids`) and change it now with `POST /control`; they say "Changing to ..." until the car has made the change, and why a change failed. Needs the rebuilt ESP32 firmware
+- Tiles are smaller to fit two rows; the startup tiles no longer say "at startup"
+- `fetchData` skips values missing from the response; `sendData` passes the HTTP status to its callback
+- Controls help: the startup Drive Mode and ESP Sport mention the live tiles
+- The startup Drive Mode pop-up no longer offers Custom; a Custom already saved on the ESP32 still shows on the tile
+- Harness: the mock ESP32 reports `mode`/`esc` and takes `POST /control`; Controls scenarios cover both groups and the new live controls (changing, failing, not available); screenshots and tour updated
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.17.0JC] - 2026-10-01
+- The main view is now two pages. The engine page has boost, gear, a G-force plot, coolant, oil, intake, PTU and RDU temps, small brake, steering and yaw bars, and the date and time; the logo opens a new AWD page with the PTU, RDU and clutch temps, each clutch's torque, the torque split, total torque and front/rear slip on the left, and a top-down Focus RS with each tyre's pressure and wheel speed, and the car's speed, on the right
+- A Controls button on the far left of both pages (the green `controls_grid_right` icon) opens Controls; the logo switches pages instead. Controls and settings go back to the page you left
+- Removed the lambda gauge and the Not Alone torque split gauge (the new firmware always reports lambda as 0); the OBD toggle stays on the settings page but no longer affects the gauge pages
+- New Speed unit toggle (km/h, mph) on the settings page; `SpeedUnit` in `NutronConfig.ini`
+- New `PageChrome`, `ReadyToRace`, `GForceGauge`, `BarGauge` and `CarTopView` components; `Controller.formatValue()` and `unitLabel()`
+- Controls help: new Controls button row, and the logo row is now "Logo - Second page"
+- Harness: engine page, gear, speed units, AWD page, tyre limits, hot PTU/RDU, clutch torque lines and page navigation scenarios replace the old main view ones; the mock ESP32 sends all the new values; screenshots and tour updated
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults

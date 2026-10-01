@@ -6,6 +6,8 @@ RSapp 2.8.1 firmware sends:
     GET  /pids      live values (temps, tire pressures, RDU torque)
     GET  /settings  toggles, including cobbFriendly (OBD Not Alone)
     POST /settings  JSON body like {"cobbFriendly": 1}; merged into the state
+    POST /control   {"mode": 0-3} and/or {"esc": 0-2}: change the car's drive mode / ESC
+                    now (the firmware's /pids then reports it as "mode" / "esc")
 
 Single-threaded like the real ESP32's HTTP server. Run it on its own for
 manual testing (python dev/mock_esp32.py) or use it from harness.py.
@@ -22,6 +24,11 @@ DEFAULT_PIDS = {
     "flw": 3.0, "frw": 3.0, "rlw": 2.95, "rrw": 2.95,     # bar (about 43 psi)
     "rdutl": 71, "rdutr": 74,                             # RDU clutch temps, C
     "rdutql": 120, "rdutqr": 135,                         # RDU clutch torque, Nm
+    "mode": 0, "esc": 0,                                  # car's drive mode (0-3) and ESC (0 on, 1 sport, 2 off)
+    "boost": 0.9, "coolant": 91, "iat": 28,               # bar, C, C
+    "speed": 87, "wheelFL": 87, "wheelFR": 87.5, "wheelRL": 86.5, "wheelRR": 87,   # km/h
+    "gear": 3, "latG": 0.35, "longG": 0.2, "vertG": 1.0,  # g
+    "yaw": 6, "steering": -40, "brake": 20,               # deg/s, deg (positive right), % of range
 }
 
 # Values the app doesn't read (units, wifi, product, protocol) are placeholders.
@@ -41,8 +48,11 @@ class MockEsp32:
         self.animate = animate        # drift temps gently, for interactive use
         self.online = True            # False: drop every connection unanswered
         self.post_status = 200        # e.g. 500 to simulate a rejected change
+        self.control_status = 200     # status for POST /control, e.g. 503 for a sleeping car
+        self.hold_controls = False    # True: accept POST /control but leave /pids as it was (the car is still changing)
         self.latency = 0.0            # seconds to wait before each response
         self.posts = []               # bodies of every POST /settings, in order
+        self.controls = []            # bodies of every POST /control, in order
         self.requests = []            # "GET /pids" etc., in order
         self.started = time.time()
         self._server = HTTPServer(("127.0.0.1", port), self._handler_class())
@@ -65,7 +75,8 @@ class MockEsp32:
             self.pids = dict(DEFAULT_PIDS, **(pids or {}))
             self.settings = dict(DEFAULT_SETTINGS, **(settings or {}))
             self.online, self.post_status, self.latency = True, 200, 0.0
-            self.posts, self.requests = [], []
+            self.control_status, self.hold_controls = 200, False
+            self.posts, self.controls, self.requests = [], [], []
 
     def _live_pids(self):
         uptime = time.time() - self.started
@@ -77,6 +88,19 @@ class MockEsp32:
             pids["lambda"] = round(1 + 0.3 * math.sin(uptime), 2)
             pids["rdutql"] = max(0, round(400 + 400 * math.sin(uptime / 2)))
             pids["rdutqr"] = max(0, round(400 + 400 * math.cos(uptime / 2)))
+            pids["speed"] = round(100 + 60 * math.sin(uptime / 5))
+            for key in ("wheelFL", "wheelFR", "wheelRL", "wheelRR"):
+                pids[key] = pids["speed"]
+            pids["boost"] = round(max(0, 0.9 + 0.9 * math.sin(uptime / 3)), 2)
+            pids["coolant"] = round(91 + 6 * wobble)
+            pids["iat"] = round(30 + 8 * wobble)
+            pids["gear"] = 1 + int(uptime / 4) % 6
+            pids["latG"] = round(1.0 * math.sin(uptime / 2), 2)
+            pids["longG"] = round(0.8 * math.cos(uptime / 3), 2)
+            pids["vertG"] = round(1 + 0.1 * math.sin(uptime * 3), 2)
+            pids["yaw"] = round(40 * math.sin(uptime / 2))
+            pids["steering"] = round(200 * math.sin(uptime / 2))
+            pids["brake"] = max(0, round(60 * math.sin(uptime / 3)))
         return pids
 
     def _handler_class(self):
@@ -127,6 +151,14 @@ class MockEsp32:
                     body = json.loads(self.rfile.read(length) or b"{}")
                 except ValueError:
                     self._send_json(400, {"error": "bad json"})
+                    return
+                if self.path == "/control":
+                    with mock.lock:
+                        mock.controls.append(body)
+                        status = mock.control_status
+                        if status == 200 and not mock.hold_controls:
+                            mock.pids.update({k: body[k] for k in ("mode", "esc") if k in body})
+                    self._send_json(status, {"ok": True} if status == 200 else {"error": "refused"})
                     return
                 with mock.lock:
                     mock.posts.append(body)

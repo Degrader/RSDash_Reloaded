@@ -11,15 +11,15 @@ Item {
     property string icon
     property color colour: "#0c32ff"
     property bool lit: false
-    property int buttonSize: 104
+    property int buttonSize: 88
 
     // The round button itself, e.g. for the dev harness to check its ring
     readonly property alias button: tileButton
 
     signal tapped()
 
-    width: 200
-    height: 170
+    width: 180
+    height: 136
 
     ButtonGauge {
         id: tileButton

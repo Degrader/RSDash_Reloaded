@@ -26,6 +26,11 @@ Rectangle {
     property string temperatureUnit
     property string pressureUnit
     property string torqueUnit
+    property string speedUnit: "km/h"
+
+    // The gauge page the Controls and Settings pages go back to: the engine
+    // page (PrimaryView.qml) or the AWD page (AwdView.qml). Each sets it as it opens.
+    property string mainPageSource: "PrimaryView.qml"
 
     // OBD "Not Alone" mode: the ESP32 stops requesting lambda from the PCM
     // so another OBD device (COBB AP, scan tool) can use it. Stored on the
@@ -44,6 +49,8 @@ Rectangle {
     readonly property color driveModeColour: "#0C32FF"   // theme blue
     readonly property color startStopColour: "#0DFF5E"   // green
     readonly property color driftStickColour: "#0DFFD7"  // aqua
+    // The Controls button on the left edge of the gauge pages
+    readonly property color controlsColour: "#0DFF5E"    // green
 
     Component.onCompleted: {
         backMouseArea.enabled = false
