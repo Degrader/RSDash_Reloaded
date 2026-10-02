@@ -233,7 +233,7 @@ def run_tour(h, rec):
 def encode(source, name):
     """Encodes the lossless recording into docs/<name>.mp4 (full 2x size) and .gif."""
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    mp4 = DOCS / (name + ".mp4")
+    mp4 = DOCS / ("RSDashTour" if name == "tour" else name) .with_suffix(".mp4")
     gif = DOCS / (name + ".gif")
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(source),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "slow",

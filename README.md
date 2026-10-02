@@ -10,7 +10,7 @@ All credit for the original design, the gauge layout, and the ESP32 firmware goe
 
 ![RSdash tour: live gauges, the engine page, the AWD page, the Controls page (live drive mode and ESP, launch control, startup settings, Drift Stick), settings and Ready To Race](docs/tour.gif)
 
-A sharper version is in [docs/tour.mp4](docs/tour.mp4). It's recorded on a PC by `dev/tour.py`, against the fake ESP32 with its values drifting. To re-record it after a UI change, run `python dev/tour.py`.
+A sharper version is in [docs/RSDashTour.mp4](docs/RSDashTour.mp4). It's recorded on a PC by `dev/tour.py`, against the fake ESP32 with its values drifting. To re-record it after a UI change, run `python dev/tour.py`.
 
 ## Screenshots
 
@@ -263,7 +263,7 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - `SplitPlasmaGauge` has a `valueSpread` setting for how far apart its two values sit
 - Main view: tapping Drift Stick fans out All Modes / Drift Only / Off, replacing the on/off tap and the settings page's Drift Stick toggle; the button's status shows the current choice
 - `DriveModeFan` is now `RadialFan`, a general fan with its options and direction set by the page
-- Added a video tour (`docs/tour.gif`, `docs/tour.mp4`), recorded by `dev/tour.py`
+- Added a video tour (`docs/tour.gif`, `docs/RSDashTour.mp4`), recorded by `dev/tour.py`
 - Harness: Not Alone checks cover the torque split; added scenarios for all torque on one side and low torque, and for the Drift Stick fan (including a rejected change); shared fan layout checks; removed the settings page Drift Stick scenario
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
 

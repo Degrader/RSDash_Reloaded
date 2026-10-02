@@ -41,7 +41,7 @@ python -m pip install imageio-ffmpeg
 python dev/tour.py
 ```
 
-This records a tour of the app into `docs/tour.mp4` and `docs/tour.gif` (shown in the main README), which are committed. It drives the real app like the scenarios do, against the fake ESP32 with its values drifting, and adds a caption under each step and a ring where each tap lands. The app renders at 2x (1600x960) and is recorded at 30 fps, streamed straight into ffmpeg; the MP4 keeps the full 2x size, and the GIF is 800 px wide at 15 fps. The run prints how many frames had to be repeated to keep real-time pacing (about 7%). `imageio-ffmpeg` provides the ffmpeg build. Re-record it after a UI change.
+This records a tour of the app into `docs/RSDashTour.mp4` and `docs/tour.gif` (shown in the main README), which are committed. It drives the real app like the scenarios do, against the fake ESP32 with its values drifting, and adds a caption under each step and a ring where each tap lands. The app renders at 2x (1600x960) and is recorded at 30 fps, streamed straight into ffmpeg; the MP4 keeps the full 2x size, and the GIF is 800 px wide at 15 fps. The run prints how many frames had to be repeated to keep real-time pacing (about 7%). `imageio-ffmpeg` provides the ffmpeg build. Re-record it after a UI change.
 
 ## Clicking around yourself
 
