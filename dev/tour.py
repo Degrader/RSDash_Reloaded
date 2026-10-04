@@ -1,4 +1,4 @@
-"""Records a video tour of RSdash into docs/: tour.mp4 and tour.gif.
+"""Records a video tour of RSdash into docs/: RSDashTour.mp4 and tour.gif.
 
     python dev/tour.py
 
@@ -143,7 +143,8 @@ def run_tour(h, rec):
     # PTU starts at 70 so its drift (+-15) stays warm for the Ready To Race part
     h.start_app(pids={"ptu": 70},
                 settings={"driveMode": 1, "enableDriftMode": 0, "driftInAllModes": 0,
-                          "esp": 1, "disableStartStop": 1, "enableLC": 0})
+                          "esp": 1, "disableStartStop": 1, "enableLC": 0},
+                units="shipped")
     rec.start()
 
     say(rec, "RSdash on the Sync 3: boost, gear and G-force live from the ESP32")
@@ -230,11 +231,11 @@ def run_tour(h, rec):
     rec.stop()
 
 
-def encode(source, name):
-    """Encodes the lossless recording into docs/<name>.mp4 (full 2x size) and .gif."""
+def encode(source):
+    """Encodes the lossless recording into docs/RSDashTour.mp4 (full 2x size) and docs/tour.gif."""
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    mp4 = DOCS / ("RSDashTour" if name == "tour" else name) .with_suffix(".mp4")
-    gif = DOCS / (name + ".gif")
+    mp4 = DOCS / "RSDashTour.mp4"
+    gif = DOCS / "tour.gif"
     subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(source),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "slow",
                     "-tune", "animation", "-movflags", "+faststart", str(mp4)], check=True)
@@ -266,7 +267,7 @@ def main():
         print("    %d frames (%.1f s), %d repeated to keep pace (%.1f%%)"
               % (rec.count, rec.count / FPS, rec.repeats, 100.0 * rec.repeats / max(rec.count, 1)))
         print("== encoding")
-        encode(recording, "tour")
+        encode(recording)
         return 1 if problems else 0
     finally:
         h.close()

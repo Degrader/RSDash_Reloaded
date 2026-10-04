@@ -12,12 +12,12 @@ import QtQuick 2.6
 import "Components"
 import "Components/Controller.js" as Controller
 
-// The car controls the ESP32 offers, as tiles in two rows, opened by tapping
-// the logo on the main view. The top row changes the car straight away; the
-// "Startup" row is preferences applied the next time the car starts. Launch
-// Control, ESP Sport and auto start-stop switch on and off with a tap; the
-// drive mode, ESP and Drift Stick tiles open a pop-up to pick an option. To
-// add a control, add a ControlTile to liveRow or startupRow.
+// The car controls the ESP32 offers, as tiles in two rows, opened by the
+// button on the left edge of the gauge pages. The top row changes the car
+// straight away; the "Startup" row is preferences applied the next time the
+// car starts. Launch Control, ESP Sport and auto start-stop switch on and off
+// with a tap; the drive mode, ESP and Drift Stick tiles open a pop-up to pick
+// an option. To add a control, add a ControlTile to liveRow or startupRow.
 Rectangle {
     id: controlsViewRect
     width: 800
@@ -384,7 +384,7 @@ Rectangle {
         id: liveDriveModePopup
         anchors.fill: parent
         z: 1000
-        title: "Drive mode now"
+        title: "Drive Mode"
         subtitle: "Changes the car's drive mode right away. It takes about 5 seconds."
         accentColour: driveModeColour
         // The values POST /control takes
@@ -405,7 +405,7 @@ Rectangle {
         id: escPopup
         anchors.fill: parent
         z: 1000
-        title: "ESP now"
+        title: "ESP"
         subtitle: "Changes the car's stability control right away."
         accentColour: espColour
         options: [

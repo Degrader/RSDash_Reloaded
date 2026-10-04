@@ -24,13 +24,15 @@ Each run does three things:
 
 Screenshots go to `dev/out/` (not committed). The exit code is 0 only if everything passed.
 
+Scenarios start in metric units, the ones the ESP32 sends, so a reading is easy to check against its number. The app itself defaults to imperial; `h.start_app(units="shipped")` starts it in whatever its own `NutronConfig.ini` says, as the screenshots, the tour and `--interactive` do, and the `default_units` scenario checks that.
+
 ## README screenshots
 
 ```
 python dev/harness.py --readme-shots
 ```
 
-This re-renders the screenshots shown in the main README into `docs/screenshots/`, which are committed. Run it after a UI change, then commit the updated images.
+This re-renders the screenshots shown in the main README into `docs/screenshots/`, which are committed. They're in the app's default units, and include the pages with readings past their limits and the Controls pop-ups. Run it after a UI change, then commit the updated images.
 
 The harness uses a real window parked off-screen, so it won't take focus. The app gets a temp copy of `NutronConfig.ini`, so your repo copy is never changed.
 
@@ -57,8 +59,9 @@ Anything the app sends to the ESP32 is printed in the terminal.
 
 - `harness.py` - the runner and the scenarios. Add a new scenario by writing a function decorated with `@scenario`; `h.click("someId")`, `h.eval("js expression")`, `h.check(...)` and `h.shot("name")` cover most needs.
 - `make_icons.py` - converts the button icons in `docs/icons/` (traced SVGs made of straight lines) into `SyncMyMod/app/Components/Icons.js`, which the app draws on its canvas. Run `python dev/make_icons.py` after changing an icon; it lists which SVG each app icon comes from.
+- `make_car.py` - makes the picture of the car on the AWD page (`SyncMyMod/app/res/car_top.png`) from `docs/car/focus_rs_top.webp`: fills the gap in the roof, takes out the tyres drawn in the source (the app draws its own, so they can turn red), turns the car nose-up and scales it. It prints the tyre positions that `Components/CarTopView.qml` uses. Run `python dev/make_car.py` after replacing the source picture.
 - `tour.py` - records the video tour. The steps are in `run_tour()`; `tap()` and `say()` tap a control and set the caption.
-- `mock_esp32.py` - the fake ESP32. It serves `/pids` and `/settings` with the same JSON keys as the RSapp 2.8.1 firmware, and can be made slow, offline, or reject changes. It also runs on its own: `python dev/mock_esp32.py`.
+- `mock_esp32.py` - the fake ESP32. It serves `/pids`, `/settings` and `/control` with the JSON keys the app reads (the newer firmware's; RSapp 2.8.1 sends only some of them), and can be made slow, offline, or reject changes. It also runs on its own: `python dev/mock_esp32.py`.
 - `Host.qml` - stands in for the Sync 3 Custom Apps Loader, which provides `backMouseArea` and `back()` to the app.
 
 ## What it can't tell you

@@ -22,6 +22,10 @@ Rectangle {
     property string option2
     property string currentState: option1
 
+    // Emitted when it's tapped, with the option the tap switches to. It's up
+    // to the page to change currentState (usually by changing what it's bound to).
+    signal toggled(string value)
+
     Text {
         id: labelText
         text: label
@@ -41,6 +45,11 @@ Rectangle {
         Behavior on x {
             NumberAnimation { duration: 200 }
         }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: customToggle.toggled(currentState === option1 ? option2 : option1)
     }
 
     Text {

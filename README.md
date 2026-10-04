@@ -2,9 +2,9 @@
 
 This is a modified build of **RSdash**, originally developed by **Au{R}oN - Fmods.net** ([www.fmods.net](https://www.fmods.net)), with ESP32 canbus firmware by **Toki - Nutron Pro Moto** ([www.promoto.nutron.pl](https://www.promoto.nutron.pl)).
 
-RSdash is a free application specifically developed for the Ford Focus RS MK3.5. To use the app "as is," an ESP32 canbus microcontroller with the custom Nutron firmware is REQUIRED — get the firmware and installation guide from the `ESP32 Firmware` folder. Sync 3 has to be connected to the CANbus ESP32 microcontroller's WiFi hotspot.
+RSdash is a free application specifically developed for the Ford Focus RS MK3.5. An ESP32 canbus microcontroller with the custom Nutron firmware is REQUIRED, and the Sync 3 has to be connected to its WiFi hotspot; see [Firmware and install](#firmware-and-install).
 
-All credit for the original design, the gauge layout, and the ESP32 firmware goes to the original authors above. This fork keeps their app intact and focuses on tightening up performance on the Sync 3 head unit, plus a few layout and settings changes.
+All credit for the original design, the gauge layout, and the ESP32 firmware goes to the original authors above. This fork keeps the original app's look and its ESP32 endpoints, and adds an engine page and an AWD page, a Controls page that changes the car's drive mode and ESP straight away, a speed unit, and work on how often the app talks to the ESP32 and redraws. Every change is in the [changelog](#changelog).
 
 ## Video tour
 
@@ -14,149 +14,103 @@ A sharper version is in [docs/RSDashTour.mp4](docs/RSDashTour.mp4). It's recorde
 
 ## Screenshots
 
+### Gauge pages
+
 | Engine page | AWD page (tap the logo) |
 |:---:|:---:|
-| ![Engine page: boost, gear and a G-force plot across the top; coolant, oil, intake, PTU and RDU temps; brake, steering and yaw bars](docs/screenshots/main_view.png) | ![AWD page: PTU, RDU and clutch temps with the torque, split, total and slip on the left; the car from above with each tyre's pressure and wheel speed on the right](docs/screenshots/awd_view.png) |
-| **Controls** (button on the left edge) | **Drive mode pop-up** (tap Drive Mode) |
-| ![Controls page: the car's drive mode and ESP, Launch Control and Drift Stick in the top row; the startup drive mode, ESP Sport and Auto Start-Stop under Startup](docs/screenshots/controls.png) | ![Drive mode pop-up: Normal, Sport, Track and Drift for the startup mode, with the current one lit](docs/screenshots/drive_mode_popup.png) |
-| **Drift Stick pop-up** (tap Drift Stick) | |
-| ![Drift Stick pop-up: Off, Drift Only and All Modes, with the current choice lit](docs/screenshots/drift_stick_popup.png) | |
-| **Settings** | **Controls help** (settings, bottom left) |
-| ![Settings page: temperature, pressure, speed and torque units, the OBD mode, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, Controls and logo buttons and each control do](docs/screenshots/controls_help.png) |
+| ![Engine page: boost, gear and a G-force plot across the top; coolant, oil, intake, PTU and RDU temps; brake, steering and yaw bars; battery voltage, date and time](docs/screenshots/main_view.png) | ![AWD page: PTU, RDU and clutch temps with the torque, split, total and slip on the left; the car from above with each tyre's pressure and wheel speed on the right](docs/screenshots/awd_view.png) |
+| **Engine page, past its limits** | **AWD page, past its limits** |
+| ![Engine page with boost, coolant, intake, PTU and RDU in red, the G-force dot red at 1.15 g and the battery red at 11.6 V](docs/screenshots/engine_limits.png) | ![AWD page with the PTU and left clutch red, a low and a high tyre red (and drawn red on the car), and the slip bar red](docs/screenshots/awd_limits.png) |
+| **Metric units** (set on the settings page) | **Ready To Race** (PTU, RDU and oil all warm) |
+| ![Engine page in bar and degrees C](docs/screenshots/engine_metric.png) | ![The Ready To Race pop-up over the engine page](docs/screenshots/ready_to_race.png) |
 
-These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units, so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
+### Controls (button on the left edge)
 
-## What's changed in this fork
+| Controls | Changing the drive mode |
+|:---:|:---:|
+| ![Controls page: the car's drive mode and ESP, Launch Control and Drift Stick in the top row; the startup drive mode, ESP Sport and Auto Start-Stop under Startup](docs/screenshots/controls.png) | ![Controls page after picking Track: the Drive Mode tile says Changing to Track until the car has made the change, and a note says what was sent](docs/screenshots/controls_changing.png) |
+| **Drive Mode** (tap Drive Mode, top row) | **ESP** (tap ESP, top row) |
+| ![Drive Mode pop-up: Normal, Sport, Track and Drift, changing the car's mode right away, with the current one lit](docs/screenshots/live_drive_mode_popup.png) | ![ESP pop-up: On, Sport and Off, with the current one lit](docs/screenshots/esp_popup.png) |
+| **Startup drive mode** (tap Drive Mode under Startup) | **Drift Stick pop-up** (tap Drift Stick) |
+| ![Startup drive mode pop-up: Normal, Sport, Track and Drift for the mode the car starts in, with the current one lit](docs/screenshots/drive_mode_popup.png) | ![Drift Stick pop-up: Off, Drift Only and All Modes, with the current choice lit](docs/screenshots/drift_stick_popup.png) |
 
-Starting from v2.3, this build makes the app talk to the ESP32 less often and redraw the gauges only when something actually changes, instead of on fixed timers regardless of activity:
+### Settings
 
-- **Network polling** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/Controller.js`)
-  - The OBD Alone / Not Alone check (originally the COBB presence check) no longer rides along on the 250ms live-data poll. It now runs on its own 5-second timer, roughly halving the request rate to the ESP32.
-  - Both the live-data fetch and the OBD mode check now skip firing a new request if the previous one for that endpoint hasn't finished yet, so a slow response can't cause requests to pile up on the ESP32's single-threaded HTTP server. A request that hasn't finished after 3 seconds is abandoned, so one that never gets a reply (e.g. the ESP32 rebooting mid-response) can't block polling for good.
-  - Responses are now checked for a successful HTTP status and safely parsed (try/catch around `JSON.parse`), so a dropped connection or bad reply is logged and skipped instead of throwing inside the poll timer.
+| Settings | Controls help (settings, bottom left) |
+|:---:|:---:|
+| ![Settings page: temperature, pressure, speed and torque units and the OBD mode on the left, the tire pressure limits on the right, the Controls Help button, and the Nutron and author credits](docs/screenshots/settings.png) | ![Controls help page: what the close, settings, Controls and logo buttons and each control do](docs/screenshots/controls_help.png) |
+| **Tire pressure limits** (settings, on the right), set for drag radials | **AWD page** with those limits: the 12 psi rear tires are in range |
+| ![Settings page with the tire pressure limits at 10 and 40 PSI](docs/screenshots/settings_tire_limits.png) | ![AWD page with the front tires at 33 psi and the rear tires at 12 psi, none of them red](docs/screenshots/awd_custom_limits.png) |
 
-- **Gauge rendering** (all `Components/*Gauge.qml` files)
-  - Every gauge previously repainted its Canvas on a free-running 100ms timer regardless of whether its value had changed. Gauges now repaint only when their value actually changes.
-  - A gauge that's currently hidden (e.g. the TPMS vs. RDU extra-info area, or the invisible "dummy" gauges used to drive drive-mode state) no longer does any redraw work while hidden, and repaints once immediately when it becomes visible again.
+These are rendered on a PC by the [dev harness](dev/README.md), using a fake ESP32 and the default units (imperial, except the metric one), so the fonts differ slightly from the Sync 3. To update them after a UI change, run `python dev/harness.py --readme-shots`.
 
-- **Assets**
-  - Fixed the Ready-to-Race popup referencing a missing `res/rtr2.png`; it now points at the `res/rtr.png` file that's actually shipped.
+## What it does
 
-Starting from v2.5, the NOT ALONE function has moved to the settings page and the main view layout has changed:
+RSdash is a few pages on the Sync 3 screen. They read live values from the ESP32 over its Wi-Fi (`http://192.168.80.1/`) and show them in the units chosen on the settings page. The ESP32 sends °C, bar, Nm and km/h; the app converts. The buttons down the left edge of the two gauge pages are close (top), Controls (the green grid, in the middle) and settings (bottom).
 
-- **OBD setting** (`SyncMyMod/app/SettingsView.qml`, `SyncMyMod/app/Nutron.qml`)
-  - The original app's NOT ALONE function, for when a COBB Accessport, scan tool or other OBD device is plugged in, is now an **OBD** toggle on the settings page, with the states **Alone** and **Not Alone**. It is no longer toggled by tapping the lambda gauge.
-  - The setting is stored on the ESP32 (as `cobbFriendly`), not in `NutronConfig.ini`, so it persists across restarts and stays in sync with the RSapp phone app. The toggle dims while the change is sent and only flips once the ESP32 accepts it.
+### Engine page
 
-- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/SplitPlasmaGauge.qml`)
-  - Oil temp is now top-center; lambda is bottom-center.
-  - In Not Alone mode the ESP32 stops requesting lambda, the only value it asks the engine computer (PCM) for, so the lambda slot shows both RDU clutch temps side by side in a new split gauge instead. These come from the AWD module and keep updating.
+The page you land on. **Boost** is the big gauge on the left, with the **gear** (N, 1-6, R) and the pulsing logo in the middle, and a **G-force plot** (a dot on 0.5 g rings) with lateral, fore/aft and vertical G on the right. A row of five temp gauges follows: **coolant**, **oil**, **intake air**, **PTU** and **RDU**. **Brake**, **steering** and **yaw** are small bars along the bottom left; steering and yaw fill from the middle, so you can see which way. The **battery voltage** and the system **date and time**, in the Sync 3's own 12 or 24 hour format, are at the bottom right. Tap the logo for the AWD page.
 
-Starting from v2.7.0, the main view and the drive mode page have been rearranged:
+The **Ready To Race** logo pulses once, the first time the oil is at 65 °C, the PTU at 50 °C and the RDU at 20 °C. It shows once until the app is restarted, on either gauge page.
 
-- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/SettingsView.qml`)
-  - The ESP button has moved to the drive mode page. LC now sits in the gap between the four big gauges, and the logo (still the way to the drive mode page) heads the right column.
-  - Tire pressures and RDU torque are always shown together, evenly spaced under the logo, so the Extra View setting (TPMS / RDU) is gone. Tap the RDU Torque row to switch it to the RDU clutch temps and back. The choice holds while the app is running, and it resets to torque on restart. In OBD Not Alone mode the clutch temps are also in the split gauge, which is now captioned "OBD / NOT ALONE".
-  - Temperature gauges have a blue mark on the ring where "cold" ends and a red mark where "hot" starts, so you can see how close a reading is to turning red. The marks come from each gauge's `lowTreshold` / `highTreshold`, and are drawn by `drawThresholdMarks()` in `Controller.js`.
-  - RDU clutch temps (the bottom row and the Not Alone split gauge) turn red above 105 °C, the red line for each clutch, and show a red mark there. They have no cold threshold, so there's no blue mark.
-  - Tire pressures turn red below 35 psi (low) and above 50 psi (high); 41-46 psi is normal. The tire gauges also show the marks: blue at 35 psi, red at 50 psi. The ESP32 sends bar, so the limits are written in psi and converted (`35 / 14.5038`).
+### AWD page
 
-- **Drive mode page** (`SyncMyMod/app/SecondaryView.qml`, `SyncMyMod/app/Components/StartStopIcon.qml`)
-  - The left group is now **DRIFT STICK**. The **Drift Stick Enabled** button (formerly Drift Fury) is on the far left. Next to it, the two DRIFT IN buttons are replaced by a single toggle between **All Modes** and **Drift Mode Only**, which is dimmed and can't be changed while Drift Stick is disabled.
-  - OTHERS now has an ESP Sport button (the same setting as the main page's ESP button) and the auto start/stop button, which shows the standard auto start/stop symbol (an "A" in a circular arrow) instead of "ASS".
+On the left is the AWD system: **PTU**, **RDU** and **left and right clutch** temps, then bars for each clutch's **torque**, the **split** between them (left / right in %, filling from the middle towards the side carrying more; "- / -" under 10 Nm total), the **total** torque, and **slip**, how much faster the rear wheels turn than the front. On the right is the car from above, with a **tyre pressure** ring beside each tyre, opening towards it, the **wheel speed** under it, and the car's **speed** below. Tap the logo to go back to the engine page.
 
-Starting from v2.8.0, everything is on one page:
+### When a reading goes red
 
-- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/DriveModeFan.qml`)
-  - A column of buttons runs down the left edge, top to bottom: LC, ESP Sport, drive mode, auto start/stop and Drift Stick. Each ring is lit in the gauges' blue while its setting is on. The gauges are slightly smaller (210 px) to make room.
-  - The drive mode button shows the current mode. Tapping it dims the page and fans all five modes out in an arc to its right, the current one lit. It sits in the middle of the column so the fan has the full screen height. Picking a mode sends it to the ESP32 and closes the fan. Tapping the drive mode button again, anywhere else, or waiting 8 seconds closes it without a change.
-  - The right column runs the full height with four rows: front and rear tire pressures, then the RDU clutch temps above the RDU torque, so all four RDU values are always shown. They're labelled like the tire pressures: Temps and Torque on their rows, with RDU centred between them. Tapping the RDU row no longer switches between them. The logo is gone to make room.
-  - The settings button is at the top left, beside the close button.
+Each gauge turns red outside its limits. Temp gauges and tyre rings also have a blue mark on the ring where "cold" ends and a red one where "hot" starts (not for a limit at the end of the scale). The limits are set in the units the ESP32 sends, apart from the tyres and boost, which are set in psi.
 
-- **Drive mode page removed** (`SyncMyMod/app/SecondaryView.qml`)
-  - Its buttons are on the main view now. The All Modes / Drift Only choice for Drift Stick is a toggle on the settings page (`SyncMyMod/app/SettingsView.qml`), still dimmed and locked while Drift Stick is disabled. The settings page's back button returns to the main view.
+| Reading | Scale | Red when |
+|---|---|---|
+| Boost | 0-35 psi | over 2.2 bar (32 psi) |
+| G-force dot | rings to 1.5 g | past 1 g |
+| Coolant | 0-130 °C | under 60 or over 110 |
+| Oil | 0-150 °C | under 65 or over 110 |
+| Intake air | -20-80 °C | over 60 |
+| PTU | 0-130 °C | under 50 or over 110 |
+| RDU | 0-130 °C | under 20 or over 110 |
+| Left and right clutch | 0-120 °C | over 105 |
+| Tire pressure | 0-4 bar | under 35 psi or over 50 psi, or whatever limits are set on the settings page (the tire is drawn red too) |
+| Slip | -20 to 20 km/h | over 8 km/h |
+| Battery | | under 12 V or over 15 V |
 
-Starting from v2.9.0, OBD Not Alone mode shows the RDU torque split, and Drift Stick has its own fan:
+Not checked on the car: which way `latG` and `longG` point. The G plot puts a positive lateral G to the right and a positive longitudinal G up; `flipLateral` and `flipLongitudinal` on `GForceGauge` swap them.
 
-- **Main view** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/SplitPlasmaGauge.qml`)
-  - With the RDU clutch temps always in the right column, the gauge that replaces lambda in Not Alone mode now shows how the rear torque is split between the left and right clutches: each half is that clutch's share of the total, in %. It's worked out from the RDU torque values, which keep updating in Not Alone mode, so it needs no firmware change.
-  - Below 10 Nm total (cruising or parked) there's no real split, so both halves read 0 instead of jumping around. A share never turns the gauge red.
-  - The logo is back, centred between the four big gauges and pulsing.
+### Controls
 
-- **Drift Stick fan** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/RadialFan.qml`)
-  - Tapping Drift Stick fans out three choices up and to the right: **All Modes**, **Drift Only** and **Off**, with the current one lit. The button is lit while Drift Stick is on, and its status line shows the current choice.
-  - Each pick sends only what changes. Turning it on sends `enableDriftMode` first, and the All Modes / Drift Only choice (`driftInAllModes`) only once the ESP32 accepts, the same order the old buttons used. The settings page toggle is gone.
-  - The drive mode fan is now the general `RadialFan` component, used by both buttons.
+The Controls page has the car's controls as tiles in two rows. The top row changes the car straight away:
 
-Starting from v2.10.0, the gauges show their value with a flat cut instead of an indicator, and the logo is bigger:
+- **Drive Mode** (Normal, Sport, Track, Drift) and **ESP** (On, Sport, Off) press the car's own buttons through the ESP32, and nothing is saved. The tiles show what the car is in now, read from `/pids` every second, and say "Changing to Sport..." until the car has made the change (a drive mode change takes about 5 s), or "Not available" while the car is asleep or the firmware doesn't report it.
+- **Launch Control** (the car's automatic launch control) and **Drift Stick** (rear wheel lock through the ABS: Off, Drift Only or All Modes; needs a flashed ABS module) are ESP32 settings that work right away.
 
-- **All gauges** (`SyncMyMod/app/Components/Controller.js`, `PlasmaGauge.qml`, `SemiCircularGauge.qml`, `SplitPlasmaGauge.qml`)
-  - The round indicator circle on each gauge is gone. The coloured bar now ends in a flat cut straight across the ring, exactly at the value, so you can see precisely where a reading sits, including against the blue and red threshold marks. The start of the bar keeps its rounded end to match the grey track, and a reading at the very bottom of the scale shows no bar at all. All three gauge types draw the bar with the same `drawValueArc()` in `Controller.js`.
-- **Logo** (`SyncMyMod/app/PrimaryView.qml`)
-  - The logo between the big gauges is 80 px tall (was 50) and sits 17 px higher. The top gauges' rings are open at the bottom, so the free space between the four gauges is centred higher than the gauges themselves; the logo is now centred in that space, midway between the lower ends of the top rings and the tops of the bottom rings. It clears every ring and mark by about 14 px at the top of its pulse.
-- **Drive mode button** (`SyncMyMod/app/PrimaryView.qml`, `SyncMyMod/app/Components/ButtonGauge.qml`)
-  - The button reads **Drive** above the mode and **Mode** below it, with the mode larger, so it's balanced top to bottom. `ButtonGauge` has a new optional `topText` line for this. While a fan is open, its stand-in for the button has a solid centre, so the dimmed button's text no longer shows through behind "Close".
+Under **Startup** are the preferences the ESP32 applies the next time the car starts: the **Drive Mode** it starts in, **ESP Sport** and **Auto Start-Stop**. Launch Control, ESP Sport and Auto Start-Stop switch with a tap; the other tiles open a pop-up. A note after each change says what it did, or why it couldn't: the car isn't ready (asleep, or no CAN), the firmware is too old, or the ESP32 couldn't be reached. The page re-reads the ESP32's settings every 5 s, so it catches up when something is changed from the RSapp phone app.
 
-Starting from v2.11.0, the settings page has a controls help page:
+### Settings
 
-- **Controls help** (`SyncMyMod/app/SettingsView.qml`, `SyncMyMod/app/ControlsHelpView.qml`, `SyncMyMod/app/Components/HelpRow.qml`)
-  - A **Controls Help** button in the bottom left of the settings page opens a page explaining each control on the main view: close, settings, LC, ESP Sport, drive mode, auto start-stop and Drift Stick. Each is shown as it looks when lit, next to what it does. The back arrow returns to settings.
+A toggle for each unit: **Temperature** (Celsius, Fahrenheit), **Pressure** (Bar, PSI), **Speed** (km/h, mph) and **Torque** (Nm, Lb-Ft). They're saved in `NutronConfig.ini` on the Sync 3 and default to Fahrenheit, PSI, mph and Lb-Ft.
 
-Starting from v2.12.0, each button has its own colour and icon:
+The **tire pressure limits**, **Min** and **Max**, are the pressures the AWD page's tire rings and tires go red outside of, 35 and 50 psi to start with. They're for other tires, like drag radials. A tap changes a limit by 1 psi (0.1 bar when the pressure unit is Bar) and holding a button keeps going; a limit stops a step short of the other. **Reset to default** puts both back. They're saved in `NutronConfig.ini` (`TirePressureMinPsi` and `TirePressureMaxPsi`), the rings' blue and red marks move with them, and the ring's scale widens if the maximum is high. One pair covers all four tires, so if the fronts and rears run very different pressures, it has to span both.
 
-- **Button colours** (`SyncMyMod/app/Nutron.qml`, `PrimaryView.qml`, `ControlsHelpView.qml`, `Components/RadialFan.qml`)
-  - Each button down the left lights its ring in its own colour, so they're easy to tell apart at a glance: **LC** orange, **ESP** cyan, **Drive Mode** the theme blue, **Auto Start-Stop** green, **Drift Stick** aqua. Off is still grey. The colours share the theme blue's brightness and saturation; red and yellow are left out, as they mean "warning" on the gauges and are the text colour.
-  - Each button is an icon filling its centre: a tachometer with an LC monogram for **LC**, a car with skid marks for **ESP**, a crossed-out auto start-stop symbol for **Auto Start-Stop**, the current drive mode's icon for **Drive Mode**, and a handbrake lever for **Drift Stick**. Only Drive Mode and Drift Stick have text: the mode's name, or the Drift Stick choice, on a black tab over the bottom of the ring so it's readable. The drive mode fan shows each mode's icon (a car for Normal, S for Sport, a checkered flag for Track, a drifting car for Drift, C for Custom), and the controls help page uses the same icons.
-  - The icons are drawn on the Sync 3's QtQuick canvas, not loaded as images. `dev/make_icons.py` converts the SVGs in `docs/icons/` into polygon data (`Components/Icons.js`), trimming redundant traced points and cropping each icon to its visible shape, and `Components/SvgIcon.qml` fills them with the even-odd rule so their holes (the gauge ticks, the car windows, the checkered squares) come out right.
-  - The drive mode and Drift Stick fans light the current choice in their button's colour, and the controls help page shows each button in its colour. All five are set in one place, at the top of `Nutron.qml`.
+The **OBD** toggle (Alone, Not Alone) is for when a COBB Accessport, a scan tool or another OBD device is plugged in: Not Alone makes the ESP32 stop requesting lambda from the engine computer, so the other device can use it. It's stored on the ESP32 (as `cobbFriendly`), so it persists and stays in sync with the RSapp phone app.
 
-Starting from v2.13.0, the startup settings say so:
+**Controls Help** explains each button and tile. The page also credits Nutron and the app's authors.
 
-- **Startup settings** (`SyncMyMod/app/PrimaryView.qml`, `Components/RadialFan.qml`, `ControlsHelpView.qml`)
-  - Drive Mode, ESP Sport and Auto Start-Stop are startup preferences, as in the original RSdash manual: the ESP32 applies them the next time the car starts, and they don't change the car while it's running (use the car's own buttons for that). The drive mode fan is now headed **Startup drive mode** with a line saying when it applies, and changing any of the three shows a short note like "ESP Sport on from the next start" (or that the ESP32 couldn't be reached). The Drift Stick fan says it works right away.
-  - The app re-reads the ESP32's settings every 5 seconds, not only when it opens, so it catches up if it was opened before the Sync 3 joined the ESP32's Wi-Fi, or if a setting was changed from the RSapp phone app.
-  - The controls help page describes each control as the RSdash manual does, marking the startup settings.
+### Talking to the ESP32
 
-Starting from v2.14.0, the settings page credits Nutron:
+- `GET /pids` every 250 ms on the gauge pages, and every second on the Controls page. The engine page reads `boost` (bar), `gear` (0 neutral, 1-6, 7 reverse), `coolant`, `engine` (oil), `iat`, `ptu` and `rdu` (°C), `latG`, `longG` and `vertG` (g), `yaw` (°/s), `steering` (°, positive to the right), `brake` (%) and `battery` (V). The AWD page reads `ptu`, `rdu`, `engine`, the clutch temps `rdutl` and `rdutr`, the clutch torque `rdutql` and `rdutqr` (Nm), the tyre pressures `flw`, `frw`, `rlw` and `rrw` (bar), the wheel speeds `wheelFL`, `wheelFR`, `wheelRL` and `wheelRR` and the car's `speed` (km/h). Controls reads `mode` (0 Normal, 1 Sport, 2 Track, 3 Drift) and `esc` (0 On, 1 Sport, 2 Off).
+- `GET` and `POST /settings` (JSON) for `enableLC`, `esp`, `disableStartStop`, `driveMode`, `enableDriftMode`, `driftInAllModes` and `cobbFriendly`.
+- `POST /control` with `{"mode": 0-3}` or `{"esc": 0-2}` for the live Drive Mode and ESP. The app reads a 503 as the car not being ready and a 404 as a firmware that doesn't have it.
+- A poll is skipped if the previous one for the same endpoint hasn't finished, so a slow reply can't pile requests up on the ESP32's single-threaded HTTP server, and a request still unanswered after 3 s is abandoned, so one that never gets a reply (the ESP32 rebooting mid-response) can't block polling for good.
+- Responses are checked for a successful HTTP status and parsed inside a try/catch, so a dropped connection or a bad reply is logged and skipped. A value the firmware doesn't send is left alone.
+- Gauges repaint only when their value changes, and not at all while they're hidden.
 
-- **Settings page** (`SyncMyMod/app/SettingsView.qml`)
-  - Nutron's logo and "ESP32 device and firmware by Nutron Pro Moto" sit in the bottom right, above the app's author credit. The main view's logo image is now `res/mountuners.png`, and `res/nutron.png` is Nutron's logo.
+## Firmware and install
 
-Starting from v2.15.0, the controls have their own page:
+`ESP32 Firmware RSapp2.8.1.zip` has the original RSapp 2.8.1 firmware and its update manual, but this build needs a newer one. The 2.8.1 `/pids` sends only the tyre pressures, `ptu`, `rdu`, `engine`, the clutch temps and torque, and `lambda`, and it has no `/control`. With it, RSdash shows what it does send (the AWD page's temps, torque and tyre pressures, and the PTU, RDU and oil temps on the engine page); the other readings stay at zero, with the gear and the battery showing "-" and "--". The live Drive Mode and ESP tiles say "Not available", a change gets "This ESP32 firmware can't do that yet", and the rest of the Controls page works. The newer firmware, which sends everything listed above and takes `POST /control`, isn't in this repo.
 
-- **Controls page** (`SyncMyMod/app/ControlsView.qml`, `Components/ControlTile.qml`, `Components/OptionPopup.qml`)
-  - Tap the logo between the big gauges to open **Controls**: a grid of tiles for Launch Control, ESP Sport, Drive Mode, Auto Start-Stop and Drift Stick, each with its icon, its ring lit in its colour while it's on, and its current setting underneath ("Track at startup", "All Modes"). The back arrow returns to the gauges.
-  - Launch Control, ESP Sport and Auto Start-Stop switch with a tap. Drive Mode and Drift Stick open a pop-up showing all their options, the current one lit; tapping outside it or its close button leaves the setting as it was. A note at the bottom says which settings apply at the next start, and a short note after each change says what it did, or that the ESP32 couldn't be reached.
-  - The grid has three columns and a free space, so more controls can be added: each is one `ControlTile` in `controlGrid`.
-  - The main view is now just the gauges, centred across the screen, with the close button in the top left and the settings button in the bottom left. The drive mode and Drift Stick fans are gone (`RadialFan.qml` removed).
-
-Starting from v2.16.0, the Controls page tells live controls from startup ones and can change the car's drive mode and ESP:
-
-- **Controls page** (`SyncMyMod/app/ControlsView.qml`)
-  - Two rows. The top row, untitled, changes the car straight away: new **Drive Mode** and **ESP** tiles, then Launch Control and Drift Stick. Under the **Startup** heading: the saved Drive Mode, ESP Sport and Auto Start-Stop, applied the next time the car starts. The "at startup" suffixes are gone from the tiles; the group says it.
-  - The live Drive Mode tile (Normal, Sport, Track, Drift) and ESP tile (On, Sport, Off) show what the car is in now, read from `/pids` (`mode`, `esc`) every second, and open a pop-up. Picking an option sends `POST /control` (`{"mode": 0-3}` or `{"esc": 0-2}`) to the ESP32 firmware, which presses the car's buttons for you, and nothing is saved. Until `/pids` shows the new state (a drive mode change takes about 5 s) the tile says "Changing to Sport...". The tile says "Not available" while the car is asleep or the firmware doesn't report it (an older firmware just leaves it so).
-  - A note after a change says what it did, or why not: the car isn't ready (503, asleep or no CAN), the firmware is too old for `/control` (404), or the ESP32 couldn't be reached. (Qt reads a 409 "change already in progress" as no answer, so that shows the last one.)
-  - `Controller.fetchData` now ignores keys the firmware doesn't send, and `sendData`'s callback also gets the HTTP status. Tiles are slightly smaller (88 px buttons) to fit two rows.
-
-Starting from v2.17.0, the main view is two pages, and the left edge has a Controls button:
-
-- **Engine page** (`SyncMyMod/app/PrimaryView.qml`, `Components/GForceGauge.qml`, `Components/BarGauge.qml`)
-  - The page you land on. **Boost** is the big gauge on the left, with the **gear** (N, 1-6, R) and the pulsing logo in the middle and a **G-force plot** (a dot on 0.5 g rings, red past 1 g) with lateral, fore/aft and vertical G on the right. A row of five temp gauges follows: **coolant**, **oil**, **intake air**, **PTU** and **RDU** (blue and red marks at their cold and hot limits). **Brake**, **steering** and **yaw** are small bars along the bottom left; steering and yaw fill from the middle, so you can see which way. The **battery voltage** (red under 12 V or over 15 V) and the system **date and time** are at the bottom right, in the Sync 3's own format. All of these come from the new firmware's `/pids` values (`boost`, `gear`, `coolant`, `iat`, `ptu`, `rdu`, `latG`, `longG`, `vertG`, `yaw`, `steering`, `brake`).
-  - There is no speed gauge. Lambda is gone too: the new firmware never asks the engine computer for it (`lambda` is always 0), so there is nothing to show. The Not Alone torque split gauge went with it, and the OBD toggle on the settings page no longer changes the gauge pages.
-  - Tapping the logo opens the AWD page.
-
-- **AWD page** (`SyncMyMod/app/AwdView.qml`, `Components/CarTopView.qml`)
-  - The left of the page is the AWD system: **PTU**, **RDU** and **left and right clutch** temp gauges, then bars for each clutch's **torque**, the **split** between them (left / right in %, filling from the middle towards the side carrying more; "- / -" under 10 Nm total), the **total** torque, and **slip**, how much faster the rear wheels turn than the front (red past 8 km/h). The clutches turn red past 105 °C, the PTU and RDU past 110 °C.
-  - The right of the page is a top-down drawing of the car (honeycomb grille, corner intakes, bonnet creases, glass and roof, rear wing, diffuser with twin exhausts) with a **tyre pressure** ring beside each tyre, opening towards it, and the **wheel speed** underneath, and the car's **speed** as text under it. A tyre is drawn red when its pressure is under 35 psi or over 50 psi, the same limits as before.
-  - Tapping the logo (top left) goes back to the engine page.
-
-- **Controls button** (`SyncMyMod/app/Components/PageChrome.qml`, `docs/icons/main_page/controls_grid_right.svg`)
-  - The button on the far left, centred between the close and settings buttons (the controls grid icon in green, set by `controlsColour` in `Nutron.qml`), opens the Controls page from either gauge page. The Controls and Settings back arrows return to the page you left (`mainPageSource` in `Nutron.qml`). The logo no longer opens Controls.
-  - `PageChrome` holds the close, Controls and settings buttons so both pages share them, and `ReadyToRace` holds the Ready To Race logo, which now watches PTU, RDU and oil from either page.
-
-- **Speed unit** (`SyncMyMod/app/SettingsView.qml`, `NutronConfig.ini`, `Components/Controller.js`)
-  - A new **Speed** toggle (km/h or mph) on the settings page, saved in the ini as `SpeedUnit`. The ESP32 sends km/h. It defaults to km/h; the wheel speeds on the AWD page follow it too. `Controller.formatValue()` and `unitLabel()` turn a value into text in the chosen units, for readings that aren't a gauge.
-  - Not checked on the car: which way `latG` and `longG` point. The G plot puts a positive lateral G to the right and a positive longitudinal G up; `flipLateral` and `flipLongitudinal` on `GForceGauge` swap them.
+To install, put the `SyncMyMod` folder on a USB stick and plug it into the Sync 3. The installer (`autoinstall.sh`) needs FMods Tools 2.8 or newer and the Custom Apps Loader, and stops with a message if either is missing. An update replaces the saved units with the defaults (`OVERWRITE_CONFIG` in `autoinstall.sh`). `RSdash2.3 Manual.pdf` is the manual for the original RSdash 2.3; the pages in this build are different.
 
 ## Testing on a PC
 
@@ -332,3 +286,26 @@ From 2.7.0 on, versions are MAJOR.MINOR.PATCH, set in `SyncMyMod/app/version.txt
 - Controls help: new Controls button row, and the logo row is now "Logo - Second page"
 - Harness: engine page, gear, speed units, AWD page, tyre limits, hot PTU/RDU, clutch torque lines and page navigation scenarios replace the old main view ones; the mock ESP32 sends all the new values; screenshots and tour updated
 - Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.17.1JC] - 2026-10-01
+- Engine page: the battery voltage at the OBD port, between the brake, steering and yaw bars and the clock; "--" until the ESP32 has a reading, red under 12 V or over 15 V. The bars are narrower to make room
+- Harness: battery checks, and the mock ESP32 sends `battery`; engine page screenshot updated
+- `version.txt` still said 2.17.0 when this went out; 2.18.0 corrects it
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units to their defaults
+
+### [2.18.0JC] - 2026-10-03
+- Units now default to imperial: Fahrenheit, PSI, Lb-Ft and mph (it was Celsius, bar, Nm and km/h). They're set in `NutronConfig.ini` and built into the app, so a missing or unreadable ini no longer leaves the temperature, pressure and torque units blank. The settings page still switches each one
+- Removed code nothing used: `AlternativeButtonGauge`, `ECUGauge` and `SplitPlasmaGauge`, `Controller.getValueREADABLE()`, the `ignoreUnit` and `valueOffset` settings, and `ButtonGauge`'s status, top text and badge options
+- `PlasmaGauge` now draws every ring gauge (`SemiCircularGauge` is gone), with the usual colours, angles and size as defaults, and has `outOfRange`. New `TempGauge` and `TyreGauge` hold the settings the temperature and tyre rings share, which takes about 250 lines out of the two gauge pages
+- `CustomToggle` handles its own tap and emits `toggled(value)`, so the settings page's unit toggles are four lines each; the ini is saved from the app's unit settings
+- `Controller.PSI_PER_BAR` and `psiToBar()` replace `14.5038` written out in five places, and the unit conversion table is built once
+- Fixed a small negative reading showing as "-0" (the AWD page's Slip read "-0 mph" at rest)
+- AWD page: the car is now a picture of the Focus RS from above (`res/car_top.png`, made from `docs/car/focus_rs_top.webp` by `dev/make_car.py`, which fills a gap in the picture's roof and takes out its own tyres), in place of a line drawing. The four tyres are still drawn on top, in the picture's style, so each turns red with its pressure. The car is 180 px wide (was 200), about the same height
+- Settings: new tire pressure limits, Min and Max, for other tires like drag radials. The AWD page's tire rings, their blue and red marks and the tires on the car go red outside them (35 and 50 psi unless changed). Each tap is 1 psi, or 0.1 bar when the units are bar, and holding repeats; Reset to default puts them back. Saved in `NutronConfig.ini` as `TirePressureMinPsi` and `TirePressureMaxPsi`, and a pair that makes no sense is ignored. The units are now on the left of the page and the limits on the right; new `LimitStepper` component
+- The dev harness's `--interactive` window starts in the app's default units (it was metric, from the scenarios' pinning)
+- Controls: the top row's pop-ups are headed "Drive Mode" and "ESP" (they said "Drive mode now" and "ESP now")
+- Fixed stale comments (the Controls page opens from the left-edge button; the OBD toggle no longer changes the gauge pages)
+- README: the running "What's changed in this fork" section is now "What it does", describing the app as it is, with the red limits and what it reads from the ESP32; new "Firmware and install" section, which says what the bundled RSapp 2.8.1 firmware can't feed
+- Harness: scenarios still start in the ESP32's own units (`start_app(units="shipped")` uses the app's), new `default_units` and `tire_limits_setting` scenarios, a check for "-0"; the screenshots and the video tour are rendered in the default units
+- New screenshots: the engine and AWD pages past their limits, the engine page in metric, Ready To Race, the live drive mode and ESP pop-ups, the Controls page while a drive mode change is under way, and the tire pressure limits with the AWD page they set up
+- Installer still replaces `NutronConfig.ini` (`OVERWRITE_CONFIG="true"`), resetting saved units and tire pressure limits to their defaults, which are now imperial

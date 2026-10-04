@@ -88,8 +88,13 @@ Rectangle {
     }
 
 
+    // --- The units, on the left
+
     Column {
-        anchors.centerIn: parent
+        id: unitToggles
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: -165
         spacing: 14
 
         CustomToggle {
@@ -98,17 +103,7 @@ Rectangle {
             option1: "Celsius"
             option2: "Fahrenheit"
             currentState: temperatureUnit
-
-            MouseArea {
-                id: temperatureToggleMouseArea
-                anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    temperatureToggle.currentState = (temperatureToggle.currentState === temperatureToggle.option1 ? temperatureToggle.option2 : temperatureToggle.option1);
-                    saveSettings()
-                }
-            }
+            onToggled: { temperatureUnit = value; saveSettings() }
         }
 
         CustomToggle {
@@ -117,17 +112,7 @@ Rectangle {
             option1: "Bar"
             option2: "PSI"
             currentState: pressureUnit
-
-            MouseArea {
-                id: pressureToggleMouseArea
-                anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    pressureToggle.currentState = (pressureToggle.currentState === pressureToggle.option1 ? pressureToggle.option2 : pressureToggle.option1);
-                    saveSettings()
-                }
-            }
+            onToggled: { pressureUnit = value; saveSettings() }
         }
 
         CustomToggle {
@@ -136,17 +121,7 @@ Rectangle {
             option1: "km/h"
             option2: "mph"
             currentState: speedUnit
-
-            MouseArea {
-                id: speedToggleMouseArea
-                anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    speedToggle.currentState = (speedToggle.currentState === speedToggle.option1 ? speedToggle.option2 : speedToggle.option1);
-                    saveSettings()
-                }
-            }
+            onToggled: { speedUnit = value; saveSettings() }
         }
 
         CustomToggle {
@@ -155,22 +130,12 @@ Rectangle {
             option1: "Nm"
             option2: "Lb-Ft"
             currentState: torqueUnit
-
-            MouseArea {
-                id: torqueToggleMouseArea
-                anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    torqueToggle.currentState = (torqueToggle.currentState === torqueToggle.option1 ? torqueToggle.option2 : torqueToggle.option1);
-                    saveSettings()
-                }
-            }
+            onToggled: { torqueUnit = value; saveSettings() }
         }
 
-        // Alone: lambda on the gauge page. Not Alone: the ESP32 stops
-        // requesting lambda from the PCM so another OBD device can use it,
-        // and the gauge page shows the RDU clutch temps instead.
+        // Not Alone: the ESP32 stops requesting lambda from the PCM so another
+        // OBD device (COBB AP, scan tool) can use it. The gauge pages look the
+        // same either way.
         CustomToggle {
             id: obdToggle
             label: "OBD"
@@ -179,15 +144,76 @@ Rectangle {
             currentState: notAlone ? option2 : option1
             // Dimmed while the change is being sent to the ESP32
             opacity: obdRequestPending ? 0.5 : 1.0
+            onToggled: setNotAlone(!notAlone)
+        }
+    }
+
+    // --- The tire pressures the AWD page goes red outside of, on the right. Each
+    // step is 1 psi (or 0.1 bar, when the units are bar); the page keeps them in psi.
+
+    function setTireLimits(limits) {
+        tirePressureMin = limits[0]
+        tirePressureMax = limits[1]
+        saveSettings()
+    }
+
+    Column {
+        id: tireLimits
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: 175
+        width: 260
+        spacing: 12
+
+        Text {
+            font.pixelSize: 16
+            font.weight: Font.Bold
+            color: "#329BFD"
+            text: "TIRE PRESSURE LIMITS"
+        }
+
+        Text {
+            width: parent.width
+            font.pixelSize: 14
+            color: "#FFFFFF"
+            wrapMode: Text.WordWrap
+            text: "The AWD page's tires turn red outside these. Change them for other tires, like drag radials."
+        }
+
+        LimitStepper {
+            id: tireMinStepper
+            label: "Min"
+            valueText: Controller.tireLimitText(tirePressureMin)
+            onStepped: setTireLimits(Controller.steppedTireLimits(false, direction))
+        }
+
+        LimitStepper {
+            id: tireMaxStepper
+            label: "Max"
+            valueText: Controller.tireLimitText(tirePressureMax)
+            onStepped: setTireLimits(Controller.steppedTireLimits(true, direction))
+        }
+
+        Rectangle {
+            id: tireResetButton
+            width: parent.width
+            height: 38
+            radius: height / 2
+            color: "#1e1e1e"
+            border.color: "#0c32ff"
+            border.width: 2
+
+            Text {
+                anchors.centerIn: parent
+                font.pixelSize: 16
+                font.weight: Font.Bold
+                color: "#F8E63C"
+                text: "Reset to default"
+            }
 
             MouseArea {
-                id: obdToggleMouseArea
                 anchors.fill: parent
-                propagateComposedEvents: true
-                onClicked: {
-                    mouse.accepted = false
-                    setNotAlone(!notAlone)
-                }
+                onClicked: setTireLimits([Controller.TIRE_LIMIT_MIN_DEFAULT, Controller.TIRE_LIMIT_MAX_DEFAULT])
             }
         }
     }
@@ -262,15 +288,12 @@ Rectangle {
     function saveSettings() {
         var xhr = new XMLHttpRequest();
         xhr.open("PUT", iniFilePath, true);
-        var content = "[Settings]\n";
-        content += "TemperatureUnit=" + temperatureToggle.currentState + "\n";
-        content += "PressureUnit=" + pressureToggle.currentState + "\n";
-        content += "TorqueUnit=" + torqueToggle.currentState + "\n";
-        content += "SpeedUnit=" + speedToggle.currentState + "\n";
-        temperatureUnit = temperatureToggle.currentState
-        pressureUnit = pressureToggle.currentState
-        torqueUnit = torqueToggle.currentState
-        speedUnit = speedToggle.currentState
-        xhr.send(content);
+        xhr.send("[Settings]\n"
+                 + "TemperatureUnit=" + temperatureUnit + "\n"
+                 + "PressureUnit=" + pressureUnit + "\n"
+                 + "TorqueUnit=" + torqueUnit + "\n"
+                 + "SpeedUnit=" + speedUnit + "\n"
+                 + "TirePressureMinPsi=" + tirePressureMin + "\n"
+                 + "TirePressureMaxPsi=" + tirePressureMax + "\n");
     }
 }

@@ -1,7 +1,7 @@
 """Fake Nutron ESP32 for testing RSdash on a PC.
 
-Serves the two endpoints the app uses, with the same JSON keys the real
-RSapp 2.8.1 firmware sends:
+Serves the endpoints the app uses, with the JSON keys it reads (the newer
+firmware's: the RSapp 2.8.1 firmware in this repo sends only some of them):
 
     GET  /pids      live values (temps, tire pressures, RDU torque)
     GET  /settings  toggles, including cobbFriendly (OBD Not Alone)

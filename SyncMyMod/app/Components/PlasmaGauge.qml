@@ -12,16 +12,25 @@ import QtQuick.Controls 1.3
 
 import "Controller.js" as Controller
 
+// A ring gauge: a coloured bar along a grey track shows the value, in
+// secondaryColor outside lowTreshold..highTreshold and primaryColor inside
+// it. The reading is in the middle, with the name under it if there is one.
+// showThresholdMarks draws blue and red marks on the ring at the two limits.
+// The ring runs from startAngleDegrees to endAngleDegrees (canvas angles,
+// clockwise; reverse draws it anticlockwise).
 Rectangle {
-    id: plsamaGaugeRect
+    id: plasmaGaugeRect
     color: "transparent"
 
     property string name
-    property string unitSymbol
+    property string unitSymbol: measureType === "temperature" ? "°" : ""
 
-    property color colour
-    property color primaryColor
-    property color secondaryColor
+    property color primaryColor: "#0c32ff"
+    property color secondaryColor: "#ce1845"
+
+    // Whether the value is outside its limits, and the colour the bar is in now
+    readonly property bool outOfRange: currentValue < lowTreshold || currentValue > highTreshold
+    readonly property color colour: outOfRange ? secondaryColor : primaryColor
 
     property int nameSize
     property int valueSize
@@ -29,20 +38,22 @@ Rectangle {
     property int size
     property int thick
 
+    width: size
+    height: size
+
     property string measureType
     property int decimal
 
     property real minValue
     property real maxValue
 
-    property real startAngleDegrees
-    property real endAngleDegrees
+    property real startAngleDegrees: 145
+    property real endAngleDegrees: 395
 
     property real lowTreshold
     property real highTreshold
 
     property bool reverse: false
-    property bool ignoreUnit: false
 
     // Blue/red marks on the ring at lowTreshold/highTreshold
     property bool showThresholdMarks: measureType === "temperature"
@@ -78,12 +89,6 @@ Rectangle {
 
                 var progressAngle = startAngle + (reverse ? -normalizedValue : normalizedValue) * delta;
 
-                if (currentValue < lowTreshold || currentValue > highTreshold) {
-                    colour = secondaryColor
-                } else {
-                    colour = primaryColor
-                }
-
                 ctx.reset();
                 ctx.strokeStyle = "#1e1e1e";
                 ctx.lineCap = "round";
@@ -106,7 +111,8 @@ Rectangle {
         Text {
             id: gaugeValueText
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: -15
+            // Up, to make room for the name under it
+            anchors.verticalCenterOffset: name !== "" ? -15 : 0
             font.pixelSize: valueSize
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter

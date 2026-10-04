@@ -48,6 +48,7 @@ DEV = Path(__file__).resolve().parent
 APP = DEV.parent / "SyncMyMod" / "app"
 OUT = DEV / "out"
 README_SHOTS = DEV.parent / "docs" / "screenshots"
+METRIC_UNITS = {"TemperatureUnit": "Celsius", "PressureUnit": "Bar", "TorqueUnit": "Nm", "SpeedUnit": "km/h"}
 
 # Imports the original app uses, i.e. known to exist on the Sync 3.
 IMPORT_BASELINE = {"QtQuick": (2, 6), "QtQuick.Controls": (1, 3), "QtQuick.Window": (2, 1)}
@@ -167,9 +168,16 @@ class Harness:
 
     # -- app lifecycle
 
-    def start_app(self, ini=None, pids=None, settings=None, esp32_online=True, suppress_rtr=True):
+    def start_app(self, ini=None, pids=None, settings=None, esp32_online=True, suppress_rtr=True,
+                  units="metric", with_ini=True):
         """Fresh app instance against a reset fake ESP32 and a temp copy of the ini.
 
+        ini: values to set in the ini, e.g. {"SpeedUnit": "mph"}.
+        units: "metric" (the default) starts in the units the ESP32 sends (Celsius, bar,
+        Nm, km/h), so scenarios can check readings against its numbers. "shipped" starts
+        in the units of the app's own NutronConfig.ini, what a fresh install gets; the
+        screenshots and the tour use it. Either way, ini takes priority.
+        with_ini: False leaves the ini out, so the app has to use its built-in units.
         suppress_rtr: mark the Ready To Race popup as already shown, so it
         doesn't cover the screenshots (the default values are all warm).
         """
@@ -180,9 +188,10 @@ class Harness:
         self.tmp = Path(tempfile.mkdtemp(prefix="rsdash-harness-"))
         self.ini_path = self.tmp / "NutronConfig.ini"
         ini_text = (APP / "NutronConfig.ini").read_text(encoding="utf-8")
-        for key, value in (ini or {}).items():
+        for key, value in dict(METRIC_UNITS if units == "metric" else {}, **(ini or {})).items():
             ini_text = re.sub(r"^%s=.*$" % key, "%s=%s" % (key, value), ini_text, flags=re.M)
-        self.ini_path.write_text(ini_text, encoding="utf-8")
+        if with_ini:
+            self.ini_path.write_text(ini_text, encoding="utf-8")
 
         component = QQmlComponent(self.engine, QUrl.fromLocalFile(str(APP / "Nutron.qml")))
         if component.isError():
@@ -418,6 +427,9 @@ def speed_units(h):
     h.start_app(ini={"SpeedUnit": "mph"}, pids={"wheelFL": 100, "speed": 100})
     h.check(h.eval("speedUnit", on="app") == "mph", "mph loaded from the ini")
     h.check(h.eval("Controller.formatValue('speed', 100, 0)") == "62", "100 km/h reads 62 mph")
+    h.check(h.eval("[Controller.formatValue('speed', -0.5, 0), Controller.formatValue('speed', -0.5, 1),"
+                   " Controller.formatValue('speed', -20, 0)]") == ["0", "-0.3", "-12"],
+            "a small negative reads 0, not -0 (but -0.3 keeps its sign)")
     h.click("nutronLogo")
     h.goto_page("AwdView.qml")
     h.check(h.eval("speedText(wheelFL.currentValue)") == "62 mph", "the wheel speeds follow it")
@@ -475,6 +487,13 @@ def awd_page(h):
                    " && Math.abs(frontLeftTireGauge.y + frontLeftTireGauge.height / 2 - (carView.y + carView.frontAxleY)) < 1"
                    " && Math.abs(rearRightTireGauge.y + rearRightTireGauge.height / 2 - (carView.y + carView.rearAxleY)) < 1; })()"),
             "each tyre ring sits beside its tyre, at its axle")
+    h.check(h.eval("carView.picture.status === Image.Ready && Math.abs(carView.picture.sourceSize.width / carView.picture.sourceSize.height"
+                   " - carView.width / carView.height) < 0.002"),
+            "the car's picture loaded, in the proportions the tyres are placed for")
+    h.check(h.eval("carView.frontAxleY < carView.rearAxleY && carView.rearAxleY + carView.tireHeight / 2 < carView.height"
+                   " && carView.centreX + carView.tireOffset + carView.tireWidth / 2 <= carView.width"
+                   " && carView.centreX - carView.tireOffset - carView.tireWidth / 2 >= 0"),
+            "the tyres sit inside the picture, front axle ahead of the rear")
     h.check(h.eval("frontLeftTireGauge.startAngleDegrees === 70 && rearLeftTireGauge.startAngleDegrees === 70"
                    " && frontRightTireGauge.reverse && rearRightTireGauge.reverse"),
             "rings open towards the tyres")
@@ -505,6 +524,121 @@ def tire_pressure_limits(h):
     h.check(colours == [red, blue, red, blue], "33.4 psi red, 43.9 blue, 51.1 red, 49.0 blue")
     h.check(h.eval("[carView.tireFLColour, carView.tireFRColour, carView.tireRLColour, carView.tireRRColour].map(String)")
             == [red, "#38d3ee", red, "#38d3ee"], "the tyres on the car are drawn red where the pressure is")
+    # The picture was made without its own tyres, so a red tyre has no cyan one under or round it
+    image = h.view.grabWindow()
+
+    def cyan_around(tyre):
+        x, y, w, hgt = h.eval("(function() { var p = carView.mapToItem(null, carView.%s, carView.%s);"
+                              " return [p.x, p.y, carView.tireWidth, carView.tireHeight]; })()" % tyre)
+        count = 0
+        for dx in range(-3, int(w) + 4):
+            for dy in range(-3, int(hgt) + 4):
+                c = image.pixelColor(int(x - w / 2) + dx, int(y - hgt / 2) + dy)
+                if c.blue() > 170 and c.green() > 150 and c.red() < 110:
+                    count += 1
+        return count
+
+    stray = [cyan_around(t) for t in (("centreX - carView.tireOffset", "frontAxleY"), ("centreX - carView.tireOffset", "rearAxleY"))]
+    h.check(stray == [0, 0], "the red tyres have no cyan about them (%s cyan pixels)" % stray)
+
+
+@scenario
+def tire_limits_setting(h):
+    """The settings page sets the tire pressures the AWD page goes red outside of; they're saved, and the rings and tires follow."""
+    def hold(item, ms):
+        x, y = h.eval("(function() { var p = %s.mapToItem(null, %s.width / 2, %s.height / 2); return [p.x, p.y]; })()" % ((item,) * 3))
+        QTest.mousePress(h.view, Qt.LeftButton, Qt.NoModifier, QPoint(int(x), int(y)))
+        h.wait(ms)
+        QTest.mouseRelease(h.view, Qt.LeftButton, Qt.NoModifier, QPoint(int(x), int(y)))
+        h.wait(150)
+
+    def ini_text():
+        return h.ini_path.read_text(encoding="utf-8")
+
+    def awd_page():
+        # Back from settings goes to the gauge page it was opened from
+        h.click("backButton")
+        h.wait(500)
+        if h.current_page() != "AwdView.qml":
+            h.click("nutronLogo")
+        h.goto_page("AwdView.qml")
+        h.wait(300)
+
+    # 2.45 bar is 35.5 psi: in range at 35 psi, below a 36 psi limit
+    h.start_app(ini={"PressureUnit": "PSI"}, pids={"flw": 2.45, "frw": 3.03, "rlw": 3.03, "rrw": 3.03})
+    h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == [35, 50], "the limits start at 35 and 50 psi")
+    h.goto_settings()
+    h.check(h.eval("[tireMinStepper.valueText, tireMaxStepper.valueText]") == ["35 PSI", "50 PSI"], "the settings page shows 35 PSI and 50 PSI")
+    h.check(h.eval("[tireMinStepper.label, tireMaxStepper.label]") == ["Min", "Max"], "labelled Min and Max")
+    h.shot("tire_limits_settings")
+
+    h.click("tireMinStepper.plusButton")
+    h.check(h.eval("tirePressureMin", on="app") == 36 and h.eval("tireMinStepper.valueText") == "36 PSI", "plus on Min: 36 PSI, 1 psi a step")
+    h.check("TirePressureMinPsi=36" in ini_text() and "TirePressureMaxPsi=50" in ini_text() and "PressureUnit=PSI" in ini_text(),
+            "saved in the ini, with the units")
+    h.click("tireMaxStepper.minusButton")
+    h.check(h.eval("tirePressureMax", on="app") == 49, "minus on Max: 49")
+
+    awd_page()
+    h.check(abs(h.eval("frontLeftTireGauge.lowTreshold * 14.5038") - 36) < 1e-9
+            and abs(h.eval("frontLeftTireGauge.highTreshold * 14.5038") - 49) < 1e-9, "the ring limits (and marks) moved to 36 and 49 psi")
+    h.check(h.eval("frontLeftTireGauge.outOfRange && !frontRightTireGauge.outOfRange"), "35.5 psi is now below the limit, and red; 43.9 isn't")
+    h.check(h.eval("String(carView.tireFLColour)") == "#ce1845" and h.eval("String(carView.tireFRColour)") == "#38d3ee",
+            "the tire on the car goes red with it")
+    h.shot("tire_limits_awd")
+
+    # Holding a button keeps stepping
+    h.goto_settings()
+    before = h.eval("tirePressureMax", on="app")
+    hold("tireMaxStepper.minusButton", 1300)
+    after = h.eval("tirePressureMax", on="app")
+    h.check(before - after >= 6 and after >= h.eval("tirePressureMin", on="app") + 1, "holding minus keeps stepping (%s to %s psi)" % (before, after))
+    h.check("TirePressureMaxPsi=%g" % after in ini_text(), "and the last value is saved")
+
+    # A limit stops a step short of the other, and at the ends of the range
+    h.eval("tirePressureMin = 48; tirePressureMax = 50", on="app")
+    h.click("tireMinStepper.plusButton")
+    h.click("tireMinStepper.plusButton")
+    h.click("tireMaxStepper.minusButton")
+    h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == [49, 50], "Min stops a psi short of Max, and Max a psi above Min")
+    h.eval("tirePressureMin = 1; tirePressureMax = 99", on="app")
+    h.click("tireMinStepper.minusButton")
+    h.click("tireMinStepper.minusButton")
+    h.click("tireMaxStepper.plusButton")
+    h.click("tireMaxStepper.plusButton")
+    h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == [0, 100], "and they stop at 0 and 100 psi")
+
+    # Reset
+    h.click("tireResetButton")
+    h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == [35, 50] and "TirePressureMinPsi=35" in ini_text()
+            and "TirePressureMaxPsi=50" in ini_text(), "Reset to default: 35 and 50 psi, saved")
+
+    # In bar, a step is 0.1 bar, and the limits follow the unit
+    h.click("pressureToggle")
+    h.check(h.eval("[tireMinStepper.valueText, tireMaxStepper.valueText]") == ["2.4 BAR", "3.4 BAR"], "in bar they read 2.4 BAR and 3.4 BAR")
+    h.click("tireMinStepper.plusButton")
+    h.check(h.eval("tireMinStepper.valueText") == "2.5 BAR" and abs(h.eval("tirePressureMin", on="app") - 36.26) < 1e-9,
+            "a step in bar is 0.1 bar: 2.5 BAR, kept as 36.26 psi")
+    h.click("tireMinStepper.plusButton")
+    h.click("tireMinStepper.minusButton")
+    h.check(h.eval("tireMinStepper.valueText") == "2.5 BAR", "up then down in bar comes back to 2.5 BAR, no drift")
+    h.click("pressureToggle")
+    h.check(h.eval("tireMinStepper.valueText") == "36 PSI", "and back in psi it reads 36 PSI")
+
+    # A wider range makes the rings' scale wider; the default scale is unchanged
+    h.click("tireResetButton")
+    awd_page()
+    h.check(h.eval("frontLeftTireGauge.maxValue") == 4, "the ring scale is 4 bar at the default limits")
+    h.eval("tirePressureMax = 90", on="app")
+    h.check(h.eval("frontLeftTireGauge.maxValue > frontLeftTireGauge.highTreshold"), "it makes room above a high limit like 90 psi")
+
+    # Loaded from the ini, or ignored when it makes no sense
+    for ini, expected, what in (({"TirePressureMinPsi": "10", "TirePressureMaxPsi": "40"}, [10, 40], "10 and 40 psi are used"),
+                                ({"TirePressureMinPsi": "60", "TirePressureMaxPsi": "40"}, [35, 50], "a minimum over the maximum is ignored"),
+                                ({"TirePressureMinPsi": "abc", "TirePressureMaxPsi": "40"}, [35, 50], "text is ignored"),
+                                ({"TirePressureMinPsi": "20", "TirePressureMaxPsi": "150"}, [35, 50], "a maximum over 100 psi is ignored")):
+        h.start_app(ini=ini)
+        h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == expected, "from the ini: %s" % what)
 
 
 @scenario
@@ -865,8 +999,8 @@ def controls_live(h):
     h.click("liveDriveModeTile")
     h.wait(300)
     h.check(h.eval("liveDriveModePopup.visible && !driveModePopup.visible"), "the live Drive Mode tile opens its own pop-up")
-    h.check(h.eval("liveDriveModePopup.title") == "Drive mode now" and "right away" in h.eval("liveDriveModePopup.subtitle"),
-            "headed Drive mode now, saying it applies right away")
+    h.check(h.eval("liveDriveModePopup.title") == "Drive Mode" and "right away" in h.eval("liveDriveModePopup.subtitle"),
+            "headed Drive Mode, saying it applies right away")
     h.check(h.eval("[0, 1, 2, 3].map(function(i) { return liveDriveModePopup.optionButton(i).name; })")
             == ["Normal", "Sport", "Track", "Drift"], "Normal, Sport, Track, Drift")
     h.check(h.eval("[0, 1, 2, 3].map(function(i) { return liveDriveModePopup.optionButton(i).currentValue; })") == [1, 0, 0, 0],
@@ -889,7 +1023,7 @@ def controls_live(h):
     # ESP
     h.click("escTile")
     h.wait(300)
-    h.check(h.eval("escPopup.visible") and h.eval("escPopup.title") == "ESP now", "the ESP tile opens its pop-up")
+    h.check(h.eval("escPopup.visible") and h.eval("escPopup.title") == "ESP", "the ESP tile opens its pop-up")
     h.check(h.eval("[0, 1, 2].map(function(i) { return escPopup.optionButton(i).name; })") == ["On", "Sport", "Off"],
             "On, Sport, Off")
     check_popup_layout(h, "escPopup", 3)
@@ -1004,9 +1138,15 @@ def settings_version(h):
     h.check(h.eval("nutronLogo.status === Image.Ready && nutronLogo.paintedWidth > 0"
                    " && nutronCredit.text.indexOf('Nutron') >= 0"), "Nutron logo loaded, with its credit line")
     h.check(h.eval("nutronLogo.y + nutronLogo.height <= nutronCredit.y && nutronCredit.y + nutronCredit.height <= copyright.y"
-                   " && nutronLogo.x >= obdToggle.mapToItem(null, obdToggle.width, 0).x + 10"
                    " && nutronLogo.x + nutronLogo.width <= 800 && nutronLogo.x >= controlsHelpButton.x + controlsHelpButton.width"),
-            "logo and credit sit above the author line, beside the toggles, clear of Controls Help")
+            "logo and credit sit above the author line, clear of Controls Help")
+    h.check(h.eval("(function() { var t = settingsTitle.y + settingsTitle.height;"
+                   " var lowest = tireResetButton.mapToItem(null, 0, tireResetButton.height).y;"
+                   " return unitToggles.y >= t && tireLimits.y >= t && unitToggles.x >= 60"
+                   " && unitToggles.x + unitToggles.width + 20 <= tireLimits.x && tireLimits.x + tireLimits.width <= 800"
+                   " && lowest + 8 <= nutronLogo.y && nutronLogo.x > unitToggles.x + unitToggles.width"
+                   " && unitToggles.y + unitToggles.height <= controlsHelpButton.y; })()"),
+            "the units on the left and the tire limits on the right sit under the title, clear of each other and of the credits")
     h.shot("settings_credits")
 
 
@@ -1036,6 +1176,32 @@ def settings_obd_slow_esp32(h):
     h.check(h.wait_until("!obdRequestPending", 5000), "un-dimmed after the 5 s timeout")
     h.mock.latency = 0
     h.check(h.wait_until("notAlone", 3000), "late acceptance still switched the app to Not Alone")
+
+
+@scenario
+def default_units(h):
+    """A fresh install shows Fahrenheit, psi, lb-ft and mph, with the ini or without it."""
+    shipped = (APP / "NutronConfig.ini").read_text(encoding="utf-8")
+    h.check(all(line in shipped.splitlines() for line in
+                ["TemperatureUnit=Fahrenheit", "PressureUnit=PSI", "TorqueUnit=Lb-Ft", "SpeedUnit=mph"]),
+            "the shipped NutronConfig.ini says Fahrenheit, PSI, Lb-Ft and mph")
+    imperial = ["Fahrenheit", "PSI", "Lb-Ft", "mph"]
+    for label, options in (("the shipped ini", {"units": "shipped"}), ("no ini at all", {"with_ini": False})):
+        h.start_app(**options)
+        h.check(h.eval("[temperatureUnit, pressureUnit, torqueUnit, speedUnit]", on="app") == imperial,
+                "units are %s with %s" % (", ".join(imperial), label))
+        h.check(h.eval("boostGauge.name") == "Boost PSI"
+                and h.eval("Controller.formatValue('temperature', 91, 0)") == "196"
+                and h.eval("Controller.formatValue('speed', 100, 0)") == "62",
+                "readings come out in them (Boost PSI, 91 C = 196, 100 km/h = 62)")
+        h.check(h.eval("[tirePressureMin, tirePressureMax]", on="app") == [35, 50],
+                "the tire pressure limits are 35 and 50 psi with %s" % label)
+    h.goto_settings()
+    h.check(h.eval("[temperatureToggle, pressureToggle, torqueToggle, speedToggle].map(function(t) { return t.currentState; })")
+            == imperial, "and the settings toggles show them")
+    h.start_app(ini={"TemperatureUnit": "Celsius"}, units="shipped")
+    h.check(h.eval("[temperatureUnit, pressureUnit]", on="app") == ["Celsius", "PSI"],
+            "a saved ini still wins, unit by unit")
 
 
 @scenario
@@ -1127,29 +1293,74 @@ def run_scenarios(h, log, names):
 
 
 def render_readme_shots(h):
-    """Renders the screenshots shown in README.md into docs/screenshots/."""
-    h.start_app(pids={"rdutql": 240, "rdutqr": 310})
+    """Renders the screenshots shown in README.md into docs/screenshots/, in the units the app ships with."""
+    def start(**kwargs):
+        h.start_app(units="shipped", **kwargs)
+
+    def open_awd_page():
+        h.click("nutronLogo")
+        h.goto_page("AwdView.qml")
+        h.wait(300)
+
+    def look_at(popup, tile, name):
+        h.click(tile)
+        h.wait(300)
+        h.shot(name, README_SHOTS)
+        h.click(popup + ".closeButton")
+        h.wait(300)
+
+    # The gauge pages
+    start(pids={"rdutql": 240, "rdutqr": 310})
     h.shot("main_view", README_SHOTS)
-    h.click("nutronLogo")
-    h.goto_page("AwdView.qml")
-    h.wait(300)
+    open_awd_page()
     h.shot("awd_view", README_SHOTS)
 
-    h.start_app(settings={"enableDriftMode": 1, "driftInAllModes": 1, "esp": 1, "disableStartStop": 1, "driveMode": 2},
-                pids={"mode": 1, "esc": 0})
+    # The same pages with readings past their limits: hot coolant, intake and RDU, a lot of boost,
+    # hard cornering and a flat battery; a low and a high tyre, hot PTU and left clutch, and the
+    # rear wheels spinning faster than the front
+    start(pids={"coolant": 117, "iat": 66, "rdu": 118, "ptu": 114, "boost": 2.3, "gear": 2,
+                "latG": 1.15, "longG": 0.35, "brake": 70, "steering": -310, "yaw": -45, "battery": 11.6,
+                "flw": 2.0, "rlw": 3.6, "rdutl": 112, "rdutr": 88, "rdutql": 80, "rdutqr": 410,
+                "wheelRL": 99, "wheelRR": 101, "speed": 92})
+    h.shot("engine_limits", README_SHOTS)
+    open_awd_page()
+    h.shot("awd_limits", README_SHOTS)
+
+    # The units follow the settings page: the same page in metric
+    h.start_app(units="metric")
+    h.shot("engine_metric", README_SHOTS)
+
+    # Ready To Race, the first time PTU, RDU and oil are all warm
+    start(suppress_rtr=False, pids={"ptu": 20, "rdu": 10, "engine": 40})
+    with h.mock.lock:
+        h.mock.pids.update(ptu=62, rdu=58, engine=92)
+    h.wait_until("rtrDisplayed", 2000, on="app")
+    h.wait(700)
+    # It pulses; catch it at its normal size, so the page behind still shows
+    h.wait_until("Math.abs(readyToRaceLogo.scale - 1) < 0.05", 1500)
+    h.shot("ready_to_race", README_SHOTS)
+
+    # The Controls page and its pop-ups
+    start(settings={"enableDriftMode": 1, "driftInAllModes": 1, "esp": 1, "disableStartStop": 1, "driveMode": 2,
+                    "enableLC": 1},
+          pids={"mode": 1, "esc": 1})
     h.goto_controls()
     h.wait(300)
     h.shot("controls", README_SHOTS)
-    h.click("driveModeTile")
+    look_at("liveDriveModePopup", "liveDriveModeTile", "live_drive_mode_popup")
+    look_at("escPopup", "escTile", "esp_popup")
+    look_at("driveModePopup", "driveModeTile", "drive_mode_popup")
+    look_at("driftStickPopup", "driftStickTile", "drift_stick_popup")
+
+    # A drive mode change takes about 5 s: the tile says so until the car has made it
+    h.mock.hold_controls = True
+    h.click("liveDriveModeTile")
     h.wait(300)
-    h.shot("drive_mode_popup", README_SHOTS)
-    h.click("driveModePopup.closeButton")
-    h.wait(300)
-    h.click("driftStickTile")
-    h.wait(300)
-    h.shot("drift_stick_popup", README_SHOTS)
-    h.click("driftStickPopup.closeButton")
-    h.wait(300)
+    h.click("liveDriveModePopup.optionButton(2)")
+    h.wait(500)
+    h.shot("controls_changing", README_SHOTS)
+    h.mock.hold_controls = False
+
     h.click("backButton")
     h.goto_page("PrimaryView.qml")
     h.goto_settings()
@@ -1158,9 +1369,19 @@ def render_readme_shots(h):
     h.goto_page("ControlsHelpView.qml")
     h.shot("controls_help", README_SHOTS)
 
+    # Tire pressure limits set for drag radials: 10 to 40 psi, with the fronts at 33 psi and the rears at 12
+    start(ini={"TirePressureMinPsi": "10", "TirePressureMaxPsi": "40"}, pids={"flw": 2.28, "frw": 2.28, "rlw": 0.83, "rrw": 0.83})
+    h.goto_settings()
+    h.shot("settings_tire_limits", README_SHOTS)
+    h.click("backButton")
+    h.goto_page("PrimaryView.qml")
+    open_awd_page()
+    h.shot("awd_custom_limits", README_SHOTS)
+
 
 def run_interactive(h, args):
-    h.start_app(settings={"cobbFriendly": int(args.not_alone)}, suppress_rtr=False)
+    # In the units the app starts with, as a user sees it
+    h.start_app(settings={"cobbFriendly": int(args.not_alone)}, suppress_rtr=False, units="shipped")
     h.mock.animate = args.animate
     print("RSdash is running against a fake ESP32 at %s" % h.mock.url)
     print("Anything the app sends to the ESP32 is printed below. Close the window to quit.")

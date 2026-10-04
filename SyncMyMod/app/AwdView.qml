@@ -24,9 +24,6 @@ Rectangle {
     height: 480
     color: "black"
 
-    // Red lines for the tyres, in bar (35 and 50 psi)
-    readonly property real tireLow: 35 / 14.5038
-    readonly property real tireHigh: 50 / 14.5038
     // The most a clutch's torque bar shows, in Nm
     readonly property real clutchTorqueMax: 1000
     // Below this total torque (Nm) there's no real split to show
@@ -80,10 +77,6 @@ Rectangle {
         return Controller.formatValue("speed", value, 0) + " " + Controller.unitLabel("speed")
     }
 
-    function tireAlert(bar) {
-        return bar < tireLow || bar > tireHigh
-    }
-
     PageChrome {
         id: chrome
         anchors.fill: parent
@@ -116,129 +109,59 @@ Rectangle {
 
     // --- Left: the AWD system. Temps first, then the rear torque
 
-    PlasmaGauge {
+    TempGauge {
         id: ptuGauge
         x: 68
         y: 54
-        height: size
-        width: size
         size: 130
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "PTU"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 50
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: rduGauge
         x: ptuGauge.x + 138
         y: ptuGauge.y
-        height: size
-        width: size
         size: 130
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "RDU"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 20
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
     // The RDU's clutch temps: 0-120 C scale, red line at 105 C
-    PlasmaGauge {
+    TempGauge {
         id: leftClutchGauge
         x: ptuGauge.x
         y: ptuGauge.y + 130
-        height: size
-        width: size
         size: 130
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "Left clutch"
         nameSize: 14
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 120
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 0
         highTreshold: 105
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: rightClutchGauge
         x: rduGauge.x
         y: leftClutchGauge.y
-        height: size
-        width: size
         size: 130
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "Right clutch"
         nameSize: 14
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 120
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 0
         highTreshold: 105
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
     Column {
@@ -319,129 +242,54 @@ Rectangle {
 
     CarTopView {
         id: carView
-        width: 200
+        width: 180
         x: 565 - width / 2
         y: 20
         accentColour: awdViewRect.accent
         alertColour: awdViewRect.alert
 
-        tireFLColour: tireAlert(frontLeftTireGauge.currentValue) ? alert : accent
-        tireFRColour: tireAlert(frontRightTireGauge.currentValue) ? alert : accent
-        tireRLColour: tireAlert(rearLeftTireGauge.currentValue) ? alert : accent
-        tireRRColour: tireAlert(rearRightTireGauge.currentValue) ? alert : accent
+        tireFLColour: frontLeftTireGauge.outOfRange ? alert : accent
+        tireFRColour: frontRightTireGauge.outOfRange ? alert : accent
+        tireRLColour: rearLeftTireGauge.outOfRange ? alert : accent
+        tireRRColour: rearRightTireGauge.outOfRange ? alert : accent
     }
 
     // The rings open towards their tyres
-    SemiCircularGauge {
+    TyreGauge {
         id: frontLeftTireGauge
         x: carView.x + carView.centreX - carView.tireOffset - carView.tireWidth / 2 - 8 - width
         y: carView.y + carView.frontAxleY - height / 2
-        width: size
-        height: size
-        size: 104
-        thick: 11
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 24
-        minValue: 0
-        maxValue: 4
-
-        decimal: 1
-        measureType: "pressure"
-
-        // Values are in bar; limits set in psi
-        lowTreshold: tireLow
-        highTreshold: tireHigh
-        showThresholdMarks: true
 
         startAngleDegrees: 70
         endAngleDegrees: 290
     }
 
-    SemiCircularGauge {
+    TyreGauge {
         id: frontRightTireGauge
         x: carView.x + carView.centreX + carView.tireOffset + carView.tireWidth / 2 + 8
         y: frontLeftTireGauge.y
-        width: size
-        height: size
-        size: 104
-        thick: 11
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 24
-        minValue: 0
-        maxValue: 4
-
-        decimal: 1
-        measureType: "pressure"
-
-        lowTreshold: tireLow
-        highTreshold: tireHigh
-        showThresholdMarks: true
 
         startAngleDegrees: 110
         endAngleDegrees: 250
-
         reverse: true
     }
 
-    SemiCircularGauge {
+    TyreGauge {
         id: rearLeftTireGauge
         x: frontLeftTireGauge.x
         y: carView.y + carView.rearAxleY - height / 2
-        width: size
-        height: size
-        size: 104
-        thick: 11
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 24
-        minValue: 0
-        maxValue: 4
-
-        decimal: 1
-        measureType: "pressure"
-
-        lowTreshold: tireLow
-        highTreshold: tireHigh
-        showThresholdMarks: true
 
         startAngleDegrees: 70
         endAngleDegrees: 290
     }
 
-    SemiCircularGauge {
+    TyreGauge {
         id: rearRightTireGauge
         x: frontRightTireGauge.x
         y: rearLeftTireGauge.y
-        width: size
-        height: size
-        size: 104
-        thick: 11
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 24
-        minValue: 0
-        maxValue: 4
-
-        decimal: 1
-        measureType: "pressure"
-
-        lowTreshold: tireLow
-        highTreshold: tireHigh
-        showThresholdMarks: true
 
         startAngleDegrees: 110
         endAngleDegrees: 250
-
         reverse: true
     }
 

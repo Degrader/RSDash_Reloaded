@@ -21,12 +21,19 @@ Rectangle {
     property string iniFilePath: "file:///fs/rwdata/fmods/NutronConfig.ini"
 
     property int refresh: 250
-    //property bool settingsLoaded: false
 
-    property string temperatureUnit
-    property string pressureUnit
-    property string torqueUnit
-    property string speedUnit: "km/h"
+    // The units to show, from NutronConfig.ini once it's read. These are what
+    // a fresh install starts with, and what's used if the ini can't be read.
+    property string temperatureUnit: "Fahrenheit"
+    property string pressureUnit: "PSI"
+    property string torqueUnit: "Lb-Ft"
+    property string speedUnit: "mph"
+
+    // The tire pressure, in psi, outside which the AWD page's tire rings and
+    // tires go red. Set on the settings page and saved in NutronConfig.ini (the
+    // ESP32 sends bar, but a limit is easier to think of in psi).
+    property real tirePressureMin: Controller.TIRE_LIMIT_MIN_DEFAULT
+    property real tirePressureMax: Controller.TIRE_LIMIT_MAX_DEFAULT
 
     // The gauge page the Controls and Settings pages go back to: the engine
     // page (PrimaryView.qml) or the AWD page (AwdView.qml). Each sets it as it opens.

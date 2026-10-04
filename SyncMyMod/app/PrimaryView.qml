@@ -68,32 +68,22 @@ Rectangle {
         id: boostGauge
         x: 70
         y: 4
-        height: size
-        width: size
         size: 210
         thick: 24
-
-        unitSymbol: ""
 
         name: "Boost " + Controller.unitLabel("pressure")
         nameSize: 22
 
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
         valueSize: 43
         // Bar (limits set in psi); 0 under vacuum
         minValue: 0
-        maxValue: 35 / 14.5038
+        maxValue: Controller.psiToBar(35)
 
         decimal: 1
         measureType: "pressure"
 
         lowTreshold: -1
         highTreshold: 2.2
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
     // Between boost and the G-force plot
@@ -227,160 +217,66 @@ Rectangle {
 
     // --- Temps: engine (coolant, oil, intake air), then the AWD system (PTU, RDU)
 
-    PlasmaGauge {
+    TempGauge {
         id: coolantGauge
         x: 70
         y: 222
-        height: size
-        width: size
-        size: 136
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "Coolant"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 60
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: oilGauge
         x: coolantGauge.x + 147
         y: coolantGauge.y
-        height: size
-        width: size
-        size: 136
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "Oil"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 150
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 65
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: iatGauge
         x: oilGauge.x + 147
         y: coolantGauge.y
-        height: size
-        width: size
-        size: 136
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "Intake"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
         // Can read below freezing; only a hot intake is a problem
         minValue: -20
         maxValue: 80
 
-        decimal: 0
-        measureType: "temperature"
-
         lowTreshold: -100
         highTreshold: 60
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: ptuGauge
         x: iatGauge.x + 147
         y: coolantGauge.y
-        height: size
-        width: size
-        size: 136
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "PTU"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 50
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
-    PlasmaGauge {
+    TempGauge {
         id: rduGauge
         x: ptuGauge.x + 147
         y: coolantGauge.y
-        height: size
-        width: size
-        size: 136
-        thick: 15
-
-        unitSymbol: "°"
 
         name: "RDU"
-        nameSize: 15
-
-        primaryColor: "#0c32ff"
-        secondaryColor: "#ce1845"
-
-        valueSize: 30
-        minValue: 0
         maxValue: 130
-
-        decimal: 0
-        measureType: "temperature"
 
         lowTreshold: 20
         highTreshold: 110
-
-        startAngleDegrees: 145
-        endAngleDegrees: 395
     }
 
     // --- Bottom: what the driver is doing
